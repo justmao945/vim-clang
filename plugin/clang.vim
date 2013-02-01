@@ -74,11 +74,58 @@ au FileType c,cpp call s:ClangCompleteInit()
 "}}}
 
 
+"{{{ s:DiscoverIncludeDirs
+" Discover clang default include directories.
+" Output of `echo | clang -c -v -x c++ -`:
+"   clang version ...
+"   Target: ...
+"   Thread model: ...
+"    "/usr/bin/clang" -cc1 ....
+"   clang -cc1 version ...
+"   ignoring ..
+"   #include "..."...
+"   #include <...>...
+"    /usr/include/..
+"    /usr/include/
+"    ....
+"   End of search list.
+"
+" @clang Path of clang.
+" @lang Language supported by clang: c/cpp/xxx.
+" @options Additional options passed to clang, e.g. -stdlib=libc++
+" @return List of dirs: ['path1', 'path2', ...]
+func! s:DiscoverIncludeDirs(clang, options)
+  let l:command = 'echo | ' . a:clang . ' -fsyntax-only -v ' . a:options . ' -'
+  let l:clang_output = split(system(l:command), "\n")
+  
+  let l:i = 0
+  for l:line in l:clang_output
+    if l:line =~# '^#include'
+      break
+    endif
+    let l:i += 1
+  endfor
+  
+  let l:clang_output = l:clang_output[l:i+1 : -1]
+  let l:res = []
+  for l:line in l:clang_output
+    if l:line[0] == ' '   " FIXME Not sure dirs start with a space?
+      call add(l:res, l:line[1:-1])
+    elseif l:line =~# '^End'
+      break
+    endif
+  endfor
+  return l:res
+endf
+"}}}
+
+
 "{{{ s:ClangCompleteInit
 " Initialization for this script:
 "   1. find set root to file .clang
 "   2. read config file .clang
 "   3. append user options first
+"   3.5 append clang default include directories to option
 "   4. setup buffer maps to auto completion
 "
 func! s:ClangCompleteInit()
@@ -102,6 +149,11 @@ func! s:ClangCompleteInit()
   elseif &filetype == 'cpp'
     let b:clang_options .= ' -x c++ ' . g:clang_cpp_options
   endif
+  
+  let l:incs = s:DiscoverIncludeDirs(g:clang_exec, b:clang_options)
+  for l:dir in l:incs
+    let b:clang_options .= ' -I' . l:dir
+  endfor
 
   setlocal completefunc=ClangComplete
   setlocal omnifunc=ClangComplete
@@ -213,25 +265,6 @@ func! ClangComplete(findstart, base)
       let l:col += 1
     endif
     
-    if l:ismber
-      " trim right spaces
-      while l:col > 0 && l:line[l:col -1] =~ '\s'
-        let l:col -= 1
-      endwhile
-      
-      let l:spCol = l:col + 1
-      while l:col > 0 && l:line[l:col - 1] =~# '[_0-9a-zA-Z]' " find valid ident
-        let l:col -= 1
-      endwhile
-      
-      " doesn't have an identifier before spaces and not at the beginning of the line
-      if (l:col + 1 >= l:spCol || l:line[l:col] !~# '[a-zA-Z]') && l:spCol != 1
-        echo "Invalid identifier before operator `.`, `->`, or '::'  <" 
-            \ . l:line[l:col-1 : l:spCol-2] . '>'
-        return -3
-      endif
-    endif
-   
     if b:compat == 1
       echo "Nothing to complete, blank line completion is not supported..."
       return -3
@@ -274,11 +307,10 @@ func! ClangComplete(findstart, base)
       let l:proto = l:line[l:s+2 : -1]
       
       " only show overload functions named as b:base
-      if (empty(l:res) && l:word =~# '^' . b:base)
-          \ || b:base ==# l:word
-          \ || (!empty(l:res) && (l:res[-1]["word"] !=# l:word)
-              \  && l:word =~# '^' . b:base)
-        let l:proto = substitute(l:proto, '[#<>]', '', 'g')
+      if (((!empty(l:res) && (l:res[-1]["word"] !=# l:word)) || empty(l:res))
+          \  && l:word =~# '^' . b:base && l:word !~# '(Hidden)$')
+        \ || b:base ==# l:word
+        let l:proto = substitute(l:proto, '\(<#\)\|\(#>\)\|#', '', 'g')
         call add(l:res, {
             \ 'word': l:word,
             \ 'menu': l:proto,
