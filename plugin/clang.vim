@@ -33,9 +33,18 @@
 " TODO
 "   1. Private members filter
 "   2. Super tab?
-"   3. Parse clang include directories
 "   4. Append error to split window
 "   5. Test cases
+"   6. Ignore when <.> in comments and string and includes
+"   7. PCH support, reduce a half of time to complete
+"
+" F__K:
+"   1. libcxx is slow than g++ headers
+"   2. result of STL is usually complex and hard to read...
+"   3. PCH must be recompiled after change the _header_
+"
+" Refs:
+"   [1] http://clang.llvm.org/docs/
 "}}}
 
 
@@ -172,7 +181,7 @@ endf
 " Tigger g:clang_auto_cmd when cursor is after . -> and ::
 "
 func! s:CompleteDot()
-  if g:clang_auto
+  if g:clang_auto && getline('.') !~# '^\s*#include'
     return '.' . g:clang_auto_cmd
   endif
   return '.'
@@ -266,12 +275,12 @@ func! ClangComplete(findstart, base)
     endif
     
     if b:compat == 1
-      echo "Nothing to complete, blank line completion is not supported..."
+      "Nothing to complete, blank line completion is not supported..."
       return -3
     endif
     
     if ! l:ismber && b:base == ''
-      echo "Noting to complete, pattern completion is not supported..."
+      "Noting to complete, pattern completion is not supported..."
       return -3
     endif
     " FIXME buggy when update in the second phase ?
