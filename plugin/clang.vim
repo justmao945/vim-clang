@@ -30,17 +30,19 @@
 "       Note: Use this if clang has a non-standard name, or isn't in the path.
 "       Default: 'clang'
 "
+" Note:
+"   1. Make sure clang is available when g:clang_exe is empty
+"   2. Set completeopt=menuone,preview to show prototype in preview
+"
 " TODO
 "   1. Private members filter
 "   2. Super tab?
 "   4. Append error to split window
 "   5. Test cases
-"   6. Ignore when <.> in comments and string and includes
 "   7. PCH support, reduce a half of time to complete
 "
 " F__K:
 "   1. libcxx is slow than g++ headers
-"   2. result of STL is usually complex and hard to read...
 "   3. PCH must be recompiled after change the _header_
 "
 " Refs:
@@ -129,6 +131,27 @@ endf
 "}}}
 
 
+"{{{ s:ShrinkPrevieWindow
+" Shrink preview window to fit lines.
+" Assume cursor is in the editing window, and preview window is above of it.
+func! s:ShrinkPrevieWindow()
+  "current window
+  let l:cbuf = bufnr('%')
+  let l:cft  = &filetype
+  exe "wincmd k"
+
+  " new window
+  exe 'resize ' . (line('$') - 1)
+  if l:cft !=# &filetype
+    exe 'set filetype=' . l:cft
+  endif
+
+  " back to current window
+  exe bufwinnr(l:cbuf) . 'wincmd w'
+endf
+"}}}
+
+
 "{{{ s:ClangCompleteInit
 " Initialization for this script:
 "   1. find set root to file .clang
@@ -173,6 +196,12 @@ func! s:ClangCompleteInit()
   if &filetype == 'cpp'
     inoremap <expr> <buffer> : <SID>CompleteColon()
   endif
+
+  " resize preview window
+  " Default, preview window is above of the editing window
+  if &completeopt =~ 'preview'
+    au! CompleteDone * call s:ShrinkPrevieWindow()
+  endif
 endf
 "}}}
 
@@ -215,62 +244,63 @@ endf
 " <*> is anything other then the new line `\n`
 "
 " 1  <*><IDENT><s></>         complete identfiers start with <IDENT>
-" 2  <*><IDENT><s><.><s></>   complete all members
-" 3  <*><IDENT><s><.><s><IDENT><s></>  complete identifers start with <IDENT>
-" 4  <s><.><s></>             same as 2
-" 5  <s><.><s><IDENT><s></>   same as 3
+" 2  <*><.><s></>             complete all members
+" 3  <*><.><s><IDENT><s></>   complete identifers start with <IDENT>
 "
 " Completion output of clang:
 "   COMPLETION: <ident> : <prototype>
 "   0           12     c  c+3
 "
 " More about @findstart and @base to check :h omnifunc
+"
 " FIXME Tabs can't work corrently at ... =~ '\s' ?
+"
 " TODO Cross line completion ? Because C/C++ is not strict with ` ` and '\n'
+"
 func! ClangComplete(findstart, base)
   if a:findstart
-    let l:line = getline('.')
+    let b:line = getline('.')
     let l:start = col('.') - 1 " start column
     
     "trim right spaces
-    while l:start > 0 && l:line[l:start - 1] =~ '\s'
+    while l:start > 0 && b:line[l:start - 1] =~ '\s'
       let l:start -= 1
     endwhile
     
     let l:col = l:start
     let b:compat = l:start + 1 " store current completion point
-    while l:col > 0 && l:line[l:col - 1] =~# '[_0-9a-zA-Z]'  " find valid ident
+    while l:col > 0 && b:line[l:col - 1] =~# '[_0-9a-zA-Z]'  " find valid ident
       let l:col -= 1
     endwhile
     
     let b:base = ''  " base word to filter completions
     if l:col < l:start " may exist <IDENT>
-      if l:line[l:col] =~# '[a-zA-Z]' "<ident> doesn't start with a number
-        let b:base = l:line[l:col : l:start-1]
+      if b:line[l:col] =~# '[a-zA-Z]' "<ident> doesn't start with a number
+        let b:base = b:line[l:col : l:start-1]
         let l:start = l:col " reset l:start in case 1
       else
         echo "Can't complete after an invalid identifier <"
-            \. l:line[l:col : l:start-1] . ">"
+            \. b:line[l:col : l:start-1] . ">"
         return -3
       endif
     endif
     
     " trim right spaces
-    while l:col > 0 && l:line[l:col -1] =~ '\s'
+    while l:col > 0 && b:line[l:col -1] =~ '\s'
       let l:col -= 1
     endwhile
    
     let l:ismber = 0
-    if l:line[l:col - 1] == '.'
-        \ || (l:line[l:col - 1] == '>' && l:line[l:col - 2] == '-')
+    if b:line[l:col - 1] == '.'
+        \ || (b:line[l:col - 1] == '>' && b:line[l:col - 2] == '-')
         \ || (&filetype == 'cpp' && 
-        \     l:line[l:col - 1] == ':' && l:line[l:col - 2] == ':')
+        \     b:line[l:col - 1] == ':' && b:line[l:col - 2] == ':')
       let l:start  = l:col
       let b:compat = l:col + 1
       let l:col -= 2
       let l:ismber = 1
     endif
-    if l:line[l:col - 1] == '.'
+    if b:line[l:col - 1] == '.'
       let l:col += 1
     endif
     
@@ -283,48 +313,64 @@ func! ClangComplete(findstart, base)
       "Noting to complete, pattern completion is not supported..."
       return -3
     endif
-    " FIXME buggy when update in the second phase ?
+    
+    " buggy when update in the second phase ?
     exe 'silent update'
     return l:start
   else
-    exe "cd " . b:clang_root
-    let l:command = g:clang_exec. ' -cc1 -fsyntax-only -code-completion-macros'
-          \ .' -code-completion-at='.expand("%:t").':'.line('.').':' . b:compat
-          \ .' ' . b:clang_options . ' ' . expand("%:p:.")
-    let l:clang_output = split(system(l:command), "\n")
-    let l:res = []
-    " Completions always comes after errors and warnings
-    let l:i = 0
-    for l:line in l:clang_output
-      if l:line =~# '^COMPLETION:' " parse completions
-        break
-      else " Write info to split window
-        
-        
-        
-      endif
-      let l:i += 1
-    endfor
     
-    if l:i > 0
-      let l:clang_output = l:clang_output[l:i : -1]
+    let b:lineat = line('.')
+    " Cache parsed result into b:clang_output
+    " FIXME Update of cache may be delayed when the context is changed but the
+    " completion point is same with old one.
+    " Someting like md5sum to check source ?
+    if !exists('b:clang_output') || b:compat_old != b:compat
+          \ || b:lineat_old != b:lineat || b:line_old !=# b:line[0 : b:compat-2]
+      exe "cd " . b:clang_root
+      let l:command = g:clang_exec.' -cc1 -fsyntax-only -code-completion-macros'
+            \ .' -code-completion-at='.expand("%:t").':'.b:lineat.':'.b:compat
+            \ .' '.b:clang_options.' '.expand("%:p:.")
+      let b:lineat_old = b:lineat
+      let b:compat_old = b:compat
+      let b:line_old   = b:line[0 : b:compat-2]
+      let b:clang_output = split(system(l:command), "\n")
+      
+      " Completions always comes after errors and warnings
+      let l:i = 0
+      for l:line in b:clang_output
+        if l:line =~# '^COMPLETION:' " parse completions
+          break
+        else " Write info to split window
+          
+          
+          
+        endif
+        let l:i += 1
+      endfor
+      
+      if l:i > 0
+        let b:clang_output = b:clang_output[l:i : -1]
+      endif
     endif
    
-    for l:line in l:clang_output
+    let l:res = []
+    for l:line in b:clang_output
       let l:s = stridx(l:line, ':', 13)
       let l:word  = l:line[12 : l:s-2]
       let l:proto = l:line[l:s+2 : -1]
       
-      " only show overload functions named as b:base
-      if (((!empty(l:res) && (l:res[-1]["word"] !=# l:word)) || empty(l:res))
-          \  && l:word =~# '^' . b:base && l:word !~# '(Hidden)$')
-        \ || b:base ==# l:word
-        let l:proto = substitute(l:proto, '\(<#\)\|\(#>\)\|#', '', 'g')
+      if l:word !~# '^' . b:base || l:word =~# '(Hidden)$'
+        continue
+      endif
+      
+      let l:proto = substitute(l:proto, '\(<#\)\|\(#>\)\|#', '', 'g')
+      if empty(l:res) || l:res[-1]["word"] !=# l:word
         call add(l:res, {
             \ 'word': l:word,
-            \ 'menu': l:proto,
             \ 'info': l:proto,
             \ 'dup' : 1 })
+      elseif !empty(l:res) " overload functions
+        let l:res[-1]["info"] .= "\n" . l:proto
       endif
     endfor
     return l:res
