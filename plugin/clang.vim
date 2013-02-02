@@ -30,8 +30,12 @@
 "       Note: Use this if clang has a non-standard name, or isn't in the path.
 "       Default: 'clang'
 "
+" Commands:
+"  - ClangGenPCHFromFile <stdafx.h>
+"       Generate PCH file from the give file name <stdafx.h>
+"
 " Note:
-"   1. Make sure clang is available when g:clang_exe is empty
+"   1. Make sure clang is available when g:clang_exec is empty
 "   2. Set completeopt=menuone,preview to show prototype in preview
 "
 " TODO
@@ -40,10 +44,6 @@
 "   4. Append error to split window
 "   5. Test cases
 "   7. PCH support, reduce a half of time to complete
-"
-" F__K:
-"   1. libcxx is slow than g++ headers
-"   3. PCH must be recompiled after change the _header_
 "
 " Refs:
 "   [1] http://clang.llvm.org/docs/
@@ -80,6 +80,10 @@ if !exists('g:clang_exec')
   let g:clang_exec = 'clang'
 endif
 
+if !exists('g:clang_stdafx_h')
+  let g:clang_stdafx_h = 'stdafx.h'
+endif
+
 " Init on c/c++ files
 au FileType c,cpp call s:ClangCompleteInit()
 "}}}
@@ -102,7 +106,6 @@ au FileType c,cpp call s:ClangCompleteInit()
 "   End of search list.
 "
 " @clang Path of clang.
-" @lang Language supported by clang: c/cpp/xxx.
 " @options Additional options passed to clang, e.g. -stdlib=libc++
 " @return List of dirs: ['path1', 'path2', ...]
 func! s:DiscoverIncludeDirs(clang, options)
@@ -131,6 +134,44 @@ endf
 "}}}
 
 
+"{{{  s:GenPCH
+" Generate clang precompiled header.
+" A new file with postfix '.pch' will be created if success.
+" Note: There's no need to generate PCH files for C headers, as they can be
+" parsed very fast! So only big C++ headers are recommended to be pre-compiled.
+"
+" @clang   Path of clang
+" @options Additional options passed to clang.
+" @header  Path of header to generate
+" @return  Output of clang
+"
+func! s:GenPCH(clang, options, header)
+  let l:header = expand(a:header)
+  if l:header !~? '.h'
+    echo 'Not a C/C++ header: ' . l:header
+  endif
+
+  let l:pwd = fnamemodify(l:header, ':p:h')
+  if !empty(l:pwd)
+    exe 'cd ' . l:pwd
+  endif
+
+  let l:command = a:clang . ' -cc1 ' . a:options .
+        \ ' -emit-pch -o ' . l:header.'.pch ' . l:header
+  let l:clang_output = system(l:command)
+
+  if v:shell_error
+    echo 'Clang returns error ' . v:shell_error
+    echo l:command
+    echo l:clang_output
+  else
+    echo 'Clang creates PCH flie ' . l:header . '.pch successfully!'
+  endif
+  return l:clang_output
+endf
+"}}}
+
+
 "{{{ s:ShrinkPrevieWindow
 " Shrink preview window to fit lines.
 " Assume cursor is in the editing window, and preview window is above of it.
@@ -138,8 +179,12 @@ func! s:ShrinkPrevieWindow()
   "current window
   let l:cbuf = bufnr('%')
   let l:cft  = &filetype
-  exe 'wincmd k'
-
+  wincmd k
+  " There's no window above current window
+  if bufnr('%') == l:cbuf
+    return
+  endif
+  
   " new window
   exe 'resize ' . (line('$') - 1)
   if l:cft !=# &filetype
@@ -148,60 +193,6 @@ func! s:ShrinkPrevieWindow()
 
   " back to current window
   exe bufwinnr(l:cbuf) . 'wincmd w'
-endf
-"}}}
-
-
-"{{{ s:ClangCompleteInit
-" Initialization for this script:
-"   1. find set root to file .clang
-"   2. read config file .clang
-"   3. append user options first
-"   3.5 append clang default include directories to option
-"   4. setup buffer maps to auto completion
-"
-func! s:ClangCompleteInit()
-  let l:dotclang = findfile(g:clang_dotfile, '.;')
-
-  " clang root(aka .clang located directory) for current buffer
-  let b:clang_root = fnamemodify(l:dotclang, ':p:h')
-
-  " Firstly, add clang options for current buffer file
-  let b:clang_options = ''
-  if l:dotclang != ''
-    let l:opts = readfile(l:dotclang)
-    for l:opt in l:opts
-      let b:clang_options .= ' ' . l:opt
-    endfor
-  endif
-
-  " Secondly, add options defined by user
-  if &filetype == 'c'
-    let b:clang_options .= ' -x c ' . g:clang_c_options
-  elseif &filetype == 'cpp'
-    let b:clang_options .= ' -x c++ ' . g:clang_cpp_options
-  endif
-  
-  let l:incs = s:DiscoverIncludeDirs(g:clang_exec, b:clang_options)
-  for l:dir in l:incs
-    let b:clang_options .= ' -I' . l:dir
-  endfor
-
-  setlocal completefunc=ClangComplete
-  setlocal omnifunc=ClangComplete
-
-  " Auto completion
-  inoremap <expr> <buffer> . <SID>CompleteDot()
-  inoremap <expr> <buffer> > <SID>CompleteArrow()
-  if &filetype == 'cpp'
-    inoremap <expr> <buffer> : <SID>CompleteColon()
-  endif
-
-  " resize preview window
-  " Default, preview window is above of the editing window
-  if &completeopt =~ 'preview'
-    au! CompleteDone * call s:ShrinkPrevieWindow()
-  endif
 endf
 "}}}
 
@@ -228,6 +219,80 @@ func! s:CompleteColon()
     return ':' . g:clang_auto_cmd
   endif
   return ':'
+endf
+"}}}
+
+
+"{{{ s:ClangCompleteInit
+" Initialization for this script:
+"   1. find set root to file .clang
+"   2. read config file .clang
+"   3. append user options first
+"   3.5 append clang default include directories to option
+"   4. setup buffer maps to auto completion
+"
+func! s:ClangCompleteInit()
+  let l:dotclang = findfile(g:clang_dotfile, expand('%:p:h') . ';')
+
+  " clang root(aka .clang located directory) for current buffer
+  " or empty that means $HOME
+  let b:clang_root = fnamemodify(l:dotclang, ':p:h')
+
+  " Firstly, add clang options for current buffer file
+  let b:clang_options = ''
+  if l:dotclang != ''
+    let l:opts = readfile(l:dotclang)
+    for l:opt in l:opts
+      let b:clang_options .= ' ' . l:opt
+    endfor
+  endif
+
+  " Secondly, add options defined by user
+  if &filetype == 'c'
+    let b:clang_options .= ' -x c ' . g:clang_c_options
+  elseif &filetype == 'cpp'
+    let b:clang_options .= ' -x c++ ' . g:clang_cpp_options
+  endif
+  
+  " add include directories
+  let l:incs = s:DiscoverIncludeDirs(g:clang_exec, b:clang_options)
+  for l:dir in l:incs
+    let b:clang_options .= ' -I' . l:dir
+  endfor
+  
+  " backup options without PCH option
+  let b:clang_options_noPCH = b:clang_options
+
+  " Create GenPCH command
+  com! -nargs=* ClangGenPCHFromFile
+        \ call <SID>GenPCH(g:clang_exec, b:clang_options_noPCH, <f-args>)
+
+  " try to find PCH files in ., .., and ../include
+  " Or add `-include-pch /path/to/x.h.pch` into the root file .clang
+  if b:clang_options !~# '-include-pch'
+    let l:pwd = expand('%:p:h')
+    let l:afx = findfile(g:clang_stdafx_h,
+          \ join([l:pwd, l:pwd.'/..', l:pwd.'/../include'], ','))
+    if !empty(l:afx)
+      let b:clang_options .= ' -include-pch ' . l:afx.'.pch'
+    endif
+  endif
+
+  setlocal completefunc=ClangComplete
+  setlocal omnifunc=ClangComplete
+
+  " Auto completion
+  inoremap <expr> <buffer> . <SID>CompleteDot()
+  inoremap <expr> <buffer> > <SID>CompleteArrow()
+  if &filetype == 'cpp'
+    inoremap <expr> <buffer> : <SID>CompleteColon()
+  endif
+
+  " resize preview window
+  " Default, preview window is above of the editing window
+  if &completeopt =~ 'preview'
+    au! CompleteDone * call <SID>ShrinkPrevieWindow()
+  endif
 endf
 "}}}
 
@@ -315,7 +380,7 @@ func! ClangComplete(findstart, base)
     endif
     
     " buggy when update in the second phase ?
-    exe 'silent update'
+    silent update
     return l:start
   else
     
@@ -341,7 +406,7 @@ func! ClangComplete(findstart, base)
         if l:line =~# '^COMPLETION:' " parse completions
           break
         else " Write info to split window
-          
+          echo l:line
           
           
         endif
@@ -377,3 +442,5 @@ func! ClangComplete(findstart, base)
   endif
 endf
 "}}}
+
+
