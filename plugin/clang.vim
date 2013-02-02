@@ -51,7 +51,7 @@
 
 
 "{{{ Global initialization
-if exists("g:clang_loaded")
+if exists('g:clang_loaded')
   finish
 endif
 let g:clang_loaded = 1
@@ -138,7 +138,7 @@ func! s:ShrinkPrevieWindow()
   "current window
   let l:cbuf = bufnr('%')
   let l:cft  = &filetype
-  exe "wincmd k"
+  exe 'wincmd k'
 
   " new window
   exe 'resize ' . (line('$') - 1)
@@ -164,7 +164,7 @@ func! s:ClangCompleteInit()
   let l:dotclang = findfile(g:clang_dotfile, '.;')
 
   " clang root(aka .clang located directory) for current buffer
-  let b:clang_root = fnamemodify(l:dotclang, ":p:h")
+  let b:clang_root = fnamemodify(l:dotclang, ':p:h')
 
   " Firstly, add clang options for current buffer file
   let b:clang_options = ''
@@ -279,8 +279,8 @@ func! ClangComplete(findstart, base)
         let b:base = b:line[l:col : l:start-1]
         let l:start = l:col " reset l:start in case 1
       else
-        echo "Can't complete after an invalid identifier <"
-            \. b:line[l:col : l:start-1] . ">"
+        echo 'Can not complete after an invalid identifier <'
+            \. b:line[l:col : l:start-1] . '>'
         return -3
       endif
     endif
@@ -305,12 +305,12 @@ func! ClangComplete(findstart, base)
     endif
     
     if b:compat == 1
-      "Nothing to complete, blank line completion is not supported..."
+      "Nothing to complete, blank line completion is not supported...
       return -3
     endif
     
     if ! l:ismber && b:base == ''
-      "Noting to complete, pattern completion is not supported..."
+      "Noting to complete, pattern completion is not supported...
       return -3
     endif
     
@@ -326,10 +326,10 @@ func! ClangComplete(findstart, base)
     " Someting like md5sum to check source ?
     if !exists('b:clang_output') || b:compat_old != b:compat
           \ || b:lineat_old != b:lineat || b:line_old !=# b:line[0 : b:compat-2]
-      exe "cd " . b:clang_root
+      exe 'cd ' . b:clang_root
       let l:command = g:clang_exec.' -cc1 -fsyntax-only -code-completion-macros'
-            \ .' -code-completion-at='.expand("%:t").':'.b:lineat.':'.b:compat
-            \ .' '.b:clang_options.' '.expand("%:p:.")
+            \ .' -code-completion-at='.expand('%:t').':'.b:lineat.':'.b:compat
+            \ .' '.b:clang_options.' '.expand('%:p:.')
       let b:lineat_old = b:lineat
       let b:compat_old = b:compat
       let b:line_old   = b:line[0 : b:compat-2]
@@ -364,13 +364,13 @@ func! ClangComplete(findstart, base)
       endif
       
       let l:proto = substitute(l:proto, '\(<#\)\|\(#>\)\|#', '', 'g')
-      if empty(l:res) || l:res[-1]["word"] !=# l:word
+      if empty(l:res) || l:res[-1]['word'] !=# l:word
         call add(l:res, {
             \ 'word': l:word,
             \ 'info': l:proto,
             \ 'dup' : 1 })
       elseif !empty(l:res) " overload functions
-        let l:res[-1]["info"] .= "\n" . l:proto
+        let l:res[-1]['info'] .= "\n" . l:proto
       endif
     endfor
     return l:res
