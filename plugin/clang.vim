@@ -74,8 +74,9 @@
 "
 " TODO
 "   1. Private members filter
-"   2. Super tab?
+"   2. Super tab? :h completeopt
 "   3. Highlight diag window
+"   4. Remove OmniComplete .... Pattern Not Found error?...
 "   5. Test cases
 "
 " Refs:
@@ -335,14 +336,15 @@ func! s:ShowDiagnostics(diags, mode, maxheight)
   exe 'silent resize '. (l:height - 1)
 
   setl modifiable
-  1,$ delete _   " clear buffer before write
+  silent 1,$ delete _   " clear buffer before write
   
   for l:line in a:diags
     call append(line('$')-1, l:line)
   endfor
 
-  " change file name to the last line of diags
+  " change file name to the last line of diags and goto line 1
   exe 'file ' . escape(a:diags[-1], ' \')
+  silent 1
 
   setl buftype=nofile bufhidden=hide
   setl noswapfile nobuflisted nowrap nonumber nospell noinsertmode nomodifiable
@@ -547,6 +549,7 @@ func! ClangComplete(findstart, base)
         let l:i += 1
       endfor
       
+      " FIXME add warning and note ?
       if !empty(b:diags) && b:diags[-1] =~ 'error'
         let b:diags_haserr = 1
       else
