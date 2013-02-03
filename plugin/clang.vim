@@ -1,8 +1,7 @@
 "{{{ Description
 " Script Name: clang.vim
-" Version:     1.0.0 (2013-xx-xx)
-" Authors:     2010~2013 Xavier Deguillard <deguilx@gmail.com>
-"              2013~     Jianjun Mao <justmao945@gmail.com>
+" Version:     1.0.0-beta (2013-xx-xx)
+" Authors:     2013~     Jianjun Mao <justmao945@gmail.com>
 "
 " Description: Use of clang to parse in C/C++ source files.
 "
@@ -32,17 +31,37 @@
 "       Default: 'clang'
 "       Note: Use this if clang has a non-standard name, or isn't in the path.
 "  
-"  - g:clang_show_diags
-"       If equals to 1, automatically show clang diagnostics after completion.
-"       Default: 1
+"  - g:clang_diags
+"       This option is a string combined with split mode, colon, and max height
+"       of split window. Colon and max height are optional.
+"       e.g.
+"         let g:clang_diags = 'b:rightbelow:6'
+"         let g:clang_diags = 'b:rightbelow'
+"         let g:clang_diags = ''   " <- this disable diagnostics
+"       If it equals '', disable clang diagnostics after completion, otherwise
+"       diagnostics will be put in a split window/viewport.
+"       Split policy indicators and their corresponding modes are:
+"       ''            :disable diagnostics window
+"       't:topleft'   :split SCREEN horizontally, with new split on the top
+"       't:botright'  :split SCREEN horizontally, with new split on the bottom
+"       'b:rightbelow':split VIEWPORT horizontally, with new split on the bottom
+"       'b:leftabove' :split VIEWPORT horizontally, with new split on the top
+"       Default: 'b:rightbelow:6'
+"       Note: Split modes are indicated by a single letter. Upper-case letters
+"             indicate that the SCREEN (i.e., the entire application "window" 
+"             from the operating system's perspective) should be split, while
+"             lower-case letters indicate that the VIEWPORT (i.e., the "window"
+"             in Vim's terminology, referring to the various subpanels or 
+"             splits within Vim) should be split.
 "
 "  - g:clang_stdafx_h
 "       Clang default header file name to generate PCH. Clang will find the
 "       stdafx header to speed up completion.
 "       Default: stdafx.h
-"       Note: Only find this file in current dir ".", parent dir ".." and
-"       last in "../include" dir. If it is not in mentioned dirs, it must
-"       be defined in the dotclang file "-include-pch /path/to/stdafx.h.pch"
+"       Note: Only find this file in current dir ".", parent dir ".." and last 
+"             in "../include" dir. If it is not in mentioned dirs, it must be 
+"             defined in the dotclang file "-include-pch /path/to/stdafx.h.pch"
+"             Additionally, only find PCH file stdafx for C++, but not for C.
 "
 " Commands:
 "  - ClangGenPCHFromFile <stdafx.h>
@@ -56,13 +75,13 @@
 " TODO
 "   1. Private members filter
 "   2. Super tab?
-"   4. Append error to split window
+"   3. Highlight diag window
 "   5. Test cases
 "
 " Refs:
 "   [1] http://clang.llvm.org/docs/
 "   [2] VIM help file
-"   [3]
+"   [3] VIM scripts [vim-buffergator, clang_complete]
 "}}}
 
 
@@ -96,8 +115,8 @@ if !exists('g:clang_exec')
   let g:clang_exec = 'clang'
 endif
 
-if !exists('g:clang_show_diags')
-  let g:clang_show_diags = 1
+if !exists('g:clang_diags')
+  let g:clang_diags = 'b:rightbelow:6'
 endif
 
 if !exists('g:clang_stdafx_h')
@@ -106,6 +125,22 @@ endif
 
 " Init on c/c++ files
 au FileType c,cpp call <SID>ClangCompleteInit()
+
+" Automatically resize preview window after completion.
+" Default assume preview window is above of the editing window.
+if &completeopt =~ 'preview'
+  au CompleteDone * call <SID>ShrinkPrevieWindow()
+endif
+
+" Automatically show clang diagnostics after completion.
+" Window is shared by buffers in the same tabpage,
+" and viewport is private for every source buffer.
+" Note: b:diags is created in ClangComplete(...)
+if g:clang_diags =~# '^[bt]:[a-z]\+\(:[0-9]\+\)\?$'
+  let s:i = stridx(g:clang_diags, ':', 2)
+  au CompleteDone * call <SID>ShowDiagnostics(b:diags,
+      \ g:clang_diags[0 : s:i-1], g:clang_diags[s:i+1 : -1])
+endif
 "}}}
 
 
@@ -209,6 +244,7 @@ func! s:ShrinkPrevieWindow()
   exe 'resize ' . (line('$') - 1)
   if l:cft !=# &filetype
     exe 'set filetype=' . l:cft
+    setl nobuflisted
   endif
 
   " back to current window
@@ -243,24 +279,84 @@ endf
 "}}}
 
 
-"{{{ s:ShowDiagnosticsWindow
-" Split a window to show clang diagnostics.
-" @diags  A list of lines from clang diagnostics
+"{{{ s:ShowDiagnostics
+" Split a window to show clang diagnostics. If there's no diagnostic, close
+" the split window.
+"
+" @diags A list of lines from clang diagnostics
+" @mode  Split policy indicators and their corresponding modes are:
+"       't:topleft'   :split SCREEN horizontally, with new split on the top
+"       't:botright'  :split SCREEN horizontally, with new split on the bottom
+"       'b:rightbelow':split VIEWPORT horizontally, with new split on the bottom
+"       'b:leftabove' :split VIEWPORT horizontally, with new split on the top
+" @maxheight Maximum window height.
 " @return
-func! s:ShowDiagnosticsWindow(diags)
+func! s:ShowDiagnostics(diags, mode, maxheight)
   if type(a:diags) != type([])
     echo 'Invalid arg ' . a:diags
     return
   endif
-
   
+  " according to mode, create t: or b: var
+  if a:mode[0] ==# 'b'
+    if !exists('b:diags_bufnr') || !bufexists(b:diags_bufnr)
+      let b:diags_bufnr = bufnr('ClangDiagnostics', 1)
+    endif
+    let l:diags_bufnr = b:diags_bufnr
+  else
+    if !exists('t:diags_bufnr') || !bufexists(t:diags_bufnr)
+      let t:diags_bufnr = bufnr('ClangDiagnostics', 1)
+    endif
+  endif
+  let l:sp = a:mode[2:-1]
+  let l:cbuf = bufnr('%')
+
+  let l:diags_winnr = bufwinnr(l:diags_bufnr)
+  if l:diags_winnr == -1
+    if !empty(a:diags)  " split a new window
+      exe 'silent keepalt keepjumps ' .l:sp. ' sbuffer ' .l:diags_bufnr
+    else
+      return
+    endif
+  else " goto diag window
+    exe l:diags_winnr . 'wincmd w'
+    if empty(a:diags) " hide the diag window and !!RETURN!!
+      hide
+      return
+    endif
+  endif
+
+  let l:height = len(a:diags)
+  if a:maxheight < l:height
+    let l:height = a:maxheight
+  endif
+
+  " the last line will be showed in status line as file name
+  exe 'silent resize '. (l:height - 1)
+
+  setl modifiable
+  1,$ delete _   " clear buffer before write
+  
+  for l:line in a:diags
+    call append(line('$')-1, l:line)
+  endfor
+
+  " change file name to the last line of diags
+  exe 'file ' . escape(a:diags[-1], ' \')
+
+  setl buftype=nofile bufhidden=hide
+  setl noswapfile nobuflisted nowrap nonumber nospell noinsertmode nomodifiable
+  setl cursorline
+  setl colorcolumn=-1
+
+  " back to current window
+  exe bufwinnr(l:cbuf) . 'wincmd w'
 endf
 "}}}
 
 
-
 "{{{ s:ClangCompleteInit
-" Initialization for this script:
+" Initialization for every C/C++ source buffer:
 "   1. find set root to file .clang
 "   2. read config file .clang
 "   3. append user options first
@@ -304,8 +400,8 @@ func! s:ClangCompleteInit()
         \ call <SID>GenPCH(g:clang_exec, b:clang_options_noPCH, <f-args>)
 
   " try to find PCH files in ., .., and ../include
-  " Or add `-include-pch /path/to/x.h.pch` into the root file .clang
-  if b:clang_options !~# '-include-pch'
+  " Or add `-include-pch /path/to/x.h.pch` into the root file .clang manully
+  if &filetype ==# 'cpp' && b:clang_options !~# '-include-pch'
     let l:pwd = expand('%:p:h')
     let l:afx = findfile(g:clang_stdafx_h,
           \ join([l:pwd, l:pwd.'/..', l:pwd.'/../include'], ','))
@@ -314,8 +410,8 @@ func! s:ClangCompleteInit()
     endif
   endif
 
-  setlocal completefunc=ClangComplete
-  setlocal omnifunc=ClangComplete
+  setl completefunc=ClangComplete
+  setl omnifunc=ClangComplete
 
   " Auto completion
   inoremap <expr> <buffer> . <SID>CompleteDot()
@@ -323,25 +419,15 @@ func! s:ClangCompleteInit()
   if &filetype == 'cpp'
     inoremap <expr> <buffer> : <SID>CompleteColon()
   endif
-
-  " resize preview window
-  " Default, preview window is above of the editing window
-  if &completeopt =~ 'preview'
-    au CompleteDone * call <SID>ShrinkPrevieWindow()
-  endif
-
-  " Show diagnostics after completion
-  if g:clang_show_diags
-    au CompleteDone * call <SID>ShowDiagnosticsWindow(b:diags)
-  endif
 endf
 "}}}
 
 
 "{{{ ClangComplete
 " Complete main routine, valid cases are showed as below.
-" Note: This will not parse previous lines, which means that only care
+" Note: 1. This will not parse previous lines, which means that only care
 "       current line.
+"       2. Clang diagnostics will be saved to b:diags after completion.
 "
 " <IDENT> indicates an identifier
 " </> the completion point
@@ -427,11 +513,19 @@ func! ClangComplete(findstart, base)
     
     let b:lineat = line('.')
     " Cache parsed result into b:clang_output
+    " Reparse source file when:
+    "   * first time
+    "   * completion point changed
+    "   * completion line content changed
+    "   * has errors
     " FIXME Update of cache may be delayed when the context is changed but the
     " completion point is same with old one.
     " Someting like md5sum to check source ?
-    if !exists('b:clang_output') || b:compat_old != b:compat
-          \ || b:lineat_old != b:lineat || b:line_old !=# b:line[0 : b:compat-2]
+    if !exists('b:clang_output')
+          \ || b:compat_old != b:compat
+          \ || b:lineat_old != b:lineat
+          \ || b:line_old !=# b:line[0 : b:compat-2]
+          \ || b:diags_haserr
       exe 'cd ' . b:clang_root
       let l:command = g:clang_exec.' -cc1 -fsyntax-only -code-completion-macros'
             \ .' -code-completion-at='.expand('%:t').':'.b:lineat.':'.b:compat
@@ -452,6 +546,12 @@ func! ClangComplete(findstart, base)
         endif
         let l:i += 1
       endfor
+      
+      if !empty(b:diags) && b:diags[-1] =~ 'error'
+        let b:diags_haserr = 1
+      else
+        let b:diags_haserr = 0
+      endif
       
       if l:i > 0
         let b:clang_output = b:clang_output[l:i : -1]
