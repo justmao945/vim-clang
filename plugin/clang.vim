@@ -18,35 +18,51 @@
 "  - g:clang_cpp_options
 "       Option added at the end of clang command for C++ sources.
 "       Default: ''
+"       Note: Add "-std=c++11" to support C++0x features
+"             Add "-stdlib=libc++" to use libcxx
 "
-"  - g:clang_dotfilet
-
+"  - g:clang_dotfile
 "       Each project can have a dot file at his root, containing the compiler
 "       options. This is useful if you're using some non-standard include paths.
 "       Default: '.clang'
+"       Note: Relative include and library path is recommended.
 "
 "  - g:clang_exec
-"       Name or path of clang executable.
-"       Note: Use this if clang has a non-standard name, or isn't in the path.
+"       Name or path of executable clang.
 "       Default: 'clang'
+"       Note: Use this if clang has a non-standard name, or isn't in the path.
+"  
+"  - g:clang_show_diags
+"       If equals to 1, automatically show clang diagnostics after completion.
+"       Default: 1
+"
+"  - g:clang_stdafx_h
+"       Clang default header file name to generate PCH. Clang will find the
+"       stdafx header to speed up completion.
+"       Default: stdafx.h
+"       Note: Only find this file in current dir ".", parent dir ".." and
+"       last in "../include" dir. If it is not in mentioned dirs, it must
+"       be defined in the dotclang file "-include-pch /path/to/stdafx.h.pch"
 "
 " Commands:
 "  - ClangGenPCHFromFile <stdafx.h>
-"       Generate PCH file from the give file name <stdafx.h>
+"       Generate PCH file from the give file name <stdafx.h>, which can be %
+"       (aka current file name).
 "
 " Note:
-"   1. Make sure clang is available when g:clang_exec is empty
-"   2. Set completeopt=menuone,preview to show prototype in preview
+"   1. Make sure clang is available in path when g:clang_exec is empty
+"   2. Set completeopt+=preview to show prototype in preview window
 "
 " TODO
 "   1. Private members filter
 "   2. Super tab?
 "   4. Append error to split window
 "   5. Test cases
-"   7. PCH support, reduce a half of time to complete
 "
 " Refs:
 "   [1] http://clang.llvm.org/docs/
+"   [2] VIM help file
+"   [3]
 "}}}
 
 
@@ -80,12 +96,16 @@ if !exists('g:clang_exec')
   let g:clang_exec = 'clang'
 endif
 
+if !exists('g:clang_show_diags')
+  let g:clang_show_diags = 1
+endif
+
 if !exists('g:clang_stdafx_h')
   let g:clang_stdafx_h = 'stdafx.h'
 endif
 
 " Init on c/c++ files
-au FileType c,cpp call s:ClangCompleteInit()
+au FileType c,cpp call <SID>ClangCompleteInit()
 "}}}
 
 
@@ -223,6 +243,22 @@ endf
 "}}}
 
 
+"{{{ s:ShowDiagnosticsWindow
+" Split a window to show clang diagnostics.
+" @diags  A list of lines from clang diagnostics
+" @return
+func! s:ShowDiagnosticsWindow(diags)
+  if type(a:diags) != type([])
+    echo 'Invalid arg ' . a:diags
+    return
+  endif
+
+  
+endf
+"}}}
+
+
+
 "{{{ s:ClangCompleteInit
 " Initialization for this script:
 "   1. find set root to file .clang
@@ -260,7 +296,7 @@ func! s:ClangCompleteInit()
     let b:clang_options .= ' -I' . l:dir
   endfor
   
-  " backup options without PCH option
+  " backup options without PCH support
   let b:clang_options_noPCH = b:clang_options
 
   " Create GenPCH command
@@ -291,7 +327,12 @@ func! s:ClangCompleteInit()
   " resize preview window
   " Default, preview window is above of the editing window
   if &completeopt =~ 'preview'
-    au! CompleteDone * call <SID>ShrinkPrevieWindow()
+    au CompleteDone * call <SID>ShrinkPrevieWindow()
+  endif
+
+  " Show diagnostics after completion
+  if g:clang_show_diags
+    au CompleteDone * call <SID>ShowDiagnosticsWindow(b:diags)
   endif
 endf
 "}}}
@@ -402,13 +443,12 @@ func! ClangComplete(findstart, base)
       
       " Completions always comes after errors and warnings
       let l:i = 0
+      let b:diags = []
       for l:line in b:clang_output
         if l:line =~# '^COMPLETION:' " parse completions
           break
         else " Write info to split window
-          echo l:line
-          
-          
+          call add(b:diags, l:line)
         endif
         let l:i += 1
       endfor
