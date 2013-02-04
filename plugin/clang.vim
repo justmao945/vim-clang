@@ -358,7 +358,7 @@ func! s:ClangCompleteInit()
 
   " Firstly, add clang options for current buffer file
   let b:clang_options = ''
-  if l:dotclang != ''
+  if filereadable(l:dotclang)
     let l:opts = readfile(l:dotclang)
     for l:opt in l:opts
       let b:clang_options .= ' ' . l:opt
@@ -391,8 +391,10 @@ func! s:ClangCompleteInit()
     let l:pwd = expand('%:p:h')
     let l:afx = findfile(g:clang_stdafx_h,
           \ join([l:pwd, l:pwd.'/..', l:pwd.'/../include'], ','))
-    if !empty(l:afx)
-      let b:clang_options .= ' -include-pch ' . l:afx.'.pch'
+    
+    let l:afxpch = l:afx . '.pch'
+    if filereadable(l:afxpch)
+      let b:clang_options .= ' -include-pch ' . l:afxpch
     endif
   endif
 
