@@ -126,22 +126,6 @@ endif
 
 " Init on c/c++ files
 au FileType c,cpp call <SID>ClangCompleteInit()
-
-" Automatically resize preview window after completion.
-" Default assume preview window is above of the editing window.
-if &completeopt =~ 'preview'
-  au CompleteDone * call <SID>ShrinkPrevieWindow()
-endif
-
-" Automatically show clang diagnostics after completion.
-" Window is shared by buffers in the same tabpage,
-" and viewport is private for every source buffer.
-" Note: b:diags is created in ClangComplete(...)
-if g:clang_diags =~# '^[bt]:[a-z]\+\(:[0-9]\+\)\?$'
-  let s:i = stridx(g:clang_diags, ':', 2)
-  au CompleteDone * call <SID>ShowDiagnostics(b:diags,
-      \ g:clang_diags[0 : s:i-1], g:clang_diags[s:i+1 : -1])
-endif
 "}}}
 
 
@@ -421,6 +405,22 @@ func! s:ClangCompleteInit()
   if &filetype == 'cpp'
     inoremap <expr> <buffer> : <SID>CompleteColon()
   endif
+
+  " Automatically resize preview window after completion.
+  " Default assume preview window is above of the editing window.
+  if &completeopt =~ 'preview'
+    au CompleteDone <buffer> call <SID>ShrinkPrevieWindow()
+  endif
+
+  " Automatically show clang diagnostics after completion.
+  " Window is shared by buffers in the same tabpage,
+  " and viewport is private for every source buffer.
+  " Note: b:diags is created in ClangComplete(...)
+  if g:clang_diags =~# '^[bt]:[a-z]\+\(:[0-9]\+\)\?$'
+    let s:i = stridx(g:clang_diags, ':', 2)
+    au CompleteDone <buffer> call <SID>ShowDiagnostics(b:diags,
+        \ g:clang_diags[0 : s:i-1], g:clang_diags[s:i+1 : -1])
+  endif
 endf
 "}}}
 
@@ -562,6 +562,7 @@ func! ClangComplete(findstart, base)
     endif
    
     let l:res = []
+    let l:has_preview = &completeopt =~# 'preview'
     for l:line in b:clang_output
       let l:s = stridx(l:line, ':', 13)
       let l:word  = l:line[12 : l:s-2]
@@ -575,10 +576,12 @@ func! ClangComplete(findstart, base)
       if empty(l:res) || l:res[-1]['word'] !=# l:word
         call add(l:res, {
             \ 'word': l:word,
+            \ 'menu': l:has_preview ? '' : l:proto,
             \ 'info': l:proto,
             \ 'dup' : 1 })
-      elseif !empty(l:res) " overload functions
+      elseif !empty(l:res) " overload functions, for C++
         let l:res[-1]['info'] .= "\n" . l:proto
+      else
       endif
     endfor
     return l:res
