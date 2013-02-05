@@ -244,6 +244,7 @@ func! s:ShrinkPrevieWindow()
   if l:cft !=# &filetype
     exe 'set filetype=' . l:cft
     setl nobuflisted
+    file Prototypes
   endif
 
   " back to current window
@@ -256,7 +257,7 @@ endf
 " Tigger g:clang_auto_cmd when cursor is after . -> and ::
 "
 func! s:CompleteDot()
-  if g:clang_auto && getline('.') !~# '^\s*#include'
+  if g:clang_auto && getline('.') !~# '^\s*\(#include\)\|\(//\)'
     return '.' . g:clang_auto_cmd
   endif
   return '.'
@@ -434,6 +435,7 @@ func! s:ClangCompleteInit()
   " Note: b:diags is created in ClangComplete(...)
   if g:clang_diags =~# '^[bt]:[a-z]\+\(:[0-9]\+\)\?$'
     let s:i = stridx(g:clang_diags, ':', 2)
+    let b:diags = []
     au CompleteDone <buffer> call <SID>ShowDiagnostics(b:diags,
         \ g:clang_diags[0 : s:i-1], g:clang_diags[s:i+1 : -1])
   endif
@@ -520,7 +522,6 @@ func! ClangComplete(findstart, base)
     " buggy when update in the second phase ?
     silent update
     let b:compat = l:start + 1
-    
     return l:start
   else
     let b:lineat = line('.')
