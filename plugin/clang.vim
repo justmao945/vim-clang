@@ -71,14 +71,15 @@
 " Notes:
 "   1. Make sure clang is available in path when g:clang_exec is empty
 "
-"   2. Set completeopt+=preview to show prototype in preview window
-"      e.g. for C++ sources, add
-"         au FileType cpp setlocal completeopt+=preview
+"   2. Set completeopt+=preview to show prototype in preview window.
+"      But there's no local completeopt, so we use BufEnter event.
+"      e.g. only for C++ sources but not for C, add
+"         au BufEnter *.cc,*.cpp,*.hh,*hpp set completeopt+=preview
+"         au BufEnter *.c,*.h set completeopt-=preview
 "      to .vimrc
 "
 " TODO:
 "   1. Private members filter
-"   3. Highlight diag window
 "   4. Remove OmniComplete .... Pattern Not Found error?...
 "   5. Test cases
 "
@@ -227,6 +228,10 @@ endf
 " Shrink preview window to fit lines.
 " Assume cursor is in the editing window, and preview window is above of it.
 func! s:ShrinkPrevieWindow()
+  if &completeopt !~# 'preview'
+    return
+  endif
+
   "current window
   let l:cbuf = bufnr('%')
   let l:cft  = &filetype
@@ -241,7 +246,7 @@ func! s:ShrinkPrevieWindow()
   if l:cft !=# &filetype
     exe 'set filetype=' . l:cft
     setl nobuflisted
-    file Prototypes
+    exe 'file Prototypes@' . bufnr('%')
   endif
 
   " back to current window
@@ -301,7 +306,8 @@ func! s:ShowDiagnostics(diags, mode, maxheight)
   " according to mode, create t: or b: var
   let l:p = a:mode[0]
   if !exists(l:p.':diags_bufnr') || !bufexists(eval(l:p.':diags_bufnr'))
-    exe "let ".l:p.":diags_bufnr = bufnr('ClangDiagnostics', 1)"
+    exe "let ".l:p.":diags_bufnr = bufnr('ClangDiagnostics@" .
+          \ last_buffer_nr() . "', 1)"
     let l:isnewbuf = 1
   else
     let l:isnewbuf = 0
@@ -342,7 +348,7 @@ func! s:ShowDiagnostics(diags, mode, maxheight)
 
   silent 1
   " change file name to the last line of diags and goto line 1
-  exe 'file ' . escape(l:diags[-1], ' \')
+  exe 'file ' . escape(l:diags[-1], ' \') . '@' . l:diags_bufnr
     
   if l:isnewbuf
     setl buftype=nofile bufhidden=hide
@@ -436,9 +442,7 @@ func! s:ClangCompleteInit()
 
   " Automatically resize preview window after completion.
   " Default assume preview window is above of the editing window.
-  if &completeopt =~ 'preview'
-    au CompleteDone <buffer> call <SID>ShrinkPrevieWindow()
-  endif
+  au CompleteDone <buffer> call <SID>ShrinkPrevieWindow()
 
   " Automatically show clang diagnostics after completion.
   " Window is shared by buffers in the same tabpage,
