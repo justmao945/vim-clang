@@ -68,18 +68,29 @@
 "       Generate PCH file from the give file name <stdafx.h>, which can be %
 "       (aka current file name).
 "
-" Note:
+" Notes:
 "   1. Make sure clang is available in path when g:clang_exec is empty
-"   2. Set completeopt+=preview to show prototype in preview window
 "
-" TODO
+"   2. Set completeopt+=preview to show prototype in preview window
+"      e.g. for C++ sources, add
+"         au FileType cpp setlocal completeopt+=preview
+"      to .vimrc
+"
+" TODO:
 "   1. Private members filter
-"   2. Super tab? :h completeopt
 "   3. Highlight diag window
 "   4. Remove OmniComplete .... Pattern Not Found error?...
 "   5. Test cases
 "
-" Refs:
+" Issues:
+"   1. When complete an identifier only has a char, the char will be deleted by
+"      OmniCompletion with 'longest' completeopt.
+"   
+"   2. Can't get the last error message from clang output if it is after clang
+"      COMPLETIONs. This may be caused by buffers of stdout and stderr in
+"      clang program.
+"
+" References:
 "   [1] http://clang.llvm.org/docs/
 "   [2] VIM help file
 "   [3] VIM scripts [vim-buffergator, clang_complete]
@@ -188,7 +199,10 @@ endf
 func! s:GenPCH(clang, options, header)
   let l:header = expand(a:header)
   if l:header !~? '.h'
-    echo 'Not a C/C++ header: ' . l:header
+    let cho = confirm('Not a C/C++ header: ' . l:header . "\n" .
+          \ 'Continue to generate PCH file ?',
+          \ "&Yes\n&No", 2)
+    if cho != 1 | return | endif
   endif
 
   let l:pwd = fnamemodify(l:header, ':p:h')
@@ -464,16 +478,15 @@ func! ClangComplete(findstart, base)
     endwhile
     
     let l:col = l:start
-    let b:compat = l:start + 1 " store current completion point
     while l:col > 0 && b:line[l:col - 1] =~# '[_0-9a-zA-Z]'  " find valid ident
       let l:col -= 1
     endwhile
     
     let b:base = ''  " base word to filter completions
     if l:col < l:start " may exist <IDENT>
-      if b:line[l:col] =~# '[a-zA-Z]' "<ident> doesn't start with a number
-        let b:base = b:line[l:col : l:start-1]
-        let l:start = l:col " reset l:start in case 1
+      if b:line[l:col] =~# '[_a-zA-Z]' "<ident> doesn't start with a number
+        let b:base   = b:line[l:col : l:start-1]
+        let l:start  = l:col " reset l:start in case 1
       else
         echo 'Can not complete after an invalid identifier <'
             \. b:line[l:col : l:start-1] . '>'
@@ -492,7 +505,6 @@ func! ClangComplete(findstart, base)
         \ || (&filetype == 'cpp' && 
         \     b:line[l:col - 1] == ':' && b:line[l:col - 2] == ':')
       let l:start  = l:col
-      let b:compat = l:col + 1
       let l:col -= 2
       let l:ismber = 1
     endif
@@ -500,22 +512,19 @@ func! ClangComplete(findstart, base)
       let l:col += 1
     endif
     
-    if b:compat == 1
-      "Nothing to complete, blank line completion is not supported...
-      return -3
-    endif
-    
-    if ! l:ismber && b:base == ''
-      "Noting to complete, pattern completion is not supported...
+    "Noting to complete, pattern completion is not supported...
+    if ! l:ismber && empty(b:base)
       return -3
     endif
     
     " buggy when update in the second phase ?
     silent update
+    let b:compat = l:start + 1
+    
     return l:start
   else
-    
     let b:lineat = line('.')
+    
     " Cache parsed result into b:clang_output
     " Reparse source file when:
     "   * first time
