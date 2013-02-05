@@ -557,8 +557,8 @@ func! ClangComplete(findstart, base)
           \ || b:diags_haserr
       exe 'cd ' . b:clang_root
       let l:command = g:clang_exec.' -cc1 -fsyntax-only -code-completion-macros'
-            \ .' -code-completion-at='.expand('%:t').':'.b:lineat.':'.b:compat
-            \ .' '.b:clang_options.' '.expand('%:p:.')
+            \ .' -code-completion-at='.expand('%:p').':'.b:lineat.':'.b:compat
+            \ .' '.b:clang_options.' '.expand('%:p')
       let b:lineat_old = b:lineat
       let b:compat_old = b:compat
       let b:line_old   = b:line[0 : b:compat-2]
