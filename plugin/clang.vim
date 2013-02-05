@@ -85,11 +85,8 @@
 " Issues:
 "   1. When complete an identifier only has a char, the char will be deleted by
 "      OmniCompletion with 'longest' completeopt.
+"      Vim verison: 7.3.754
 "   
-"   2. Can't get the last error message from clang output if it is after clang
-"      COMPLETIONs. This may be caused by buffers of stdout and stderr in
-"      clang program.
-"
 " References:
 "   [1] http://clang.llvm.org/docs/
 "   [2] VIM help file
@@ -283,7 +280,7 @@ endf
 " Split a window to show clang diagnostics. If there's no diagnostic, close
 " the split window.
 "
-" @diags A list of lines from clang diagnostics
+" @diags A list of lines from clang diagnostics, or a diagnostics file name.
 " @mode  Split policy indicators and their corresponding modes are:
 "       't:topleft'   :split SCREEN horizontally, with new split on the top
 "       't:botright'  :split SCREEN horizontally, with new split on the bottom
@@ -292,63 +289,77 @@ endf
 " @maxheight Maximum window height.
 " @return
 func! s:ShowDiagnostics(diags, mode, maxheight)
-  if type(a:diags) != type([])
-    echo 'Invalid arg ' . a:diags
+  let l:diags = a:diags
+
+  if type(l:diags) == type('') " diagnostics file name
+    let l:diags = readfile(l:diags)
+  elseif type(l:diags) != type([])
+    echo 'Invalid arg ' . l:diags
     return
   endif
   
   " according to mode, create t: or b: var
-  if a:mode[0] ==# 'b'
-    if !exists('b:diags_bufnr') || !bufexists(b:diags_bufnr)
-      let b:diags_bufnr = bufnr('ClangDiagnostics', 1)
-    endif
-    let l:diags_bufnr = b:diags_bufnr
+  let l:p = a:mode[0]
+  if !exists(l:p.':diags_bufnr') || !bufexists(eval(l:p.':diags_bufnr'))
+    exe "let ".l:p.":diags_bufnr = bufnr('ClangDiagnostics', 1)"
+    let l:isnewbuf = 1
   else
-    if !exists('t:diags_bufnr') || !bufexists(t:diags_bufnr)
-      let t:diags_bufnr = bufnr('ClangDiagnostics', 1)
-    endif
+    let l:isnewbuf = 0
   endif
+  let l:diags_bufnr = eval(l:p.':diags_bufnr')
   let l:sp = a:mode[2:-1]
   let l:cbuf = bufnr('%')
 
   let l:diags_winnr = bufwinnr(l:diags_bufnr)
   if l:diags_winnr == -1
-    if !empty(a:diags)  " split a new window
+    if !empty(l:diags)  " split a new window
       exe 'silent keepalt keepjumps ' .l:sp. ' sbuffer ' .l:diags_bufnr
     else
       return
     endif
   else " goto diag window
     exe l:diags_winnr . 'wincmd w'
-    if empty(a:diags) " hide the diag window and !!RETURN!!
+    if empty(l:diags) " hide the diag window and !!RETURN!!
       hide
       return
     endif
   endif
 
-  let l:height = len(a:diags)
+  let l:height = len(l:diags) - 1
   if a:maxheight < l:height
     let l:height = a:maxheight
   endif
 
   " the last line will be showed in status line as file name
-  exe 'silent resize '. (l:height - 1)
+  exe 'silent resize '. l:height
 
   setl modifiable
   silent 1,$ delete _   " clear buffer before write
   
-  for l:line in a:diags
+  for l:line in l:diags
     call append(line('$')-1, l:line)
   endfor
 
-  " change file name to the last line of diags and goto line 1
-  exe 'file ' . escape(a:diags[-1], ' \')
   silent 1
-
-  setl buftype=nofile bufhidden=hide
-  setl noswapfile nobuflisted nowrap nonumber nospell noinsertmode nomodifiable
-  setl cursorline
-  setl colorcolumn=-1
+  " change file name to the last line of diags and goto line 1
+  exe 'file ' . escape(l:diags[-1], ' \')
+    
+  if l:isnewbuf
+    setl buftype=nofile bufhidden=hide
+    setl noswapfile nobuflisted nowrap nonumber nospell noinsertmode nomodifiable
+    setl cursorline
+    setl colorcolumn=-1
+    
+    syn match ClangSynDiagsError    display 'error:'
+    syn match ClangSynDiagsWarning  display 'warning:'
+    syn match ClangSynDiagsNote     display 'note:'
+    syn match ClangSynDiagsPosition display '^\s*[~^ ]\+$'
+    
+    hi ClangSynDiagsError           guifg=Red     ctermfg=9
+    hi ClangSynDiagsWarning         guifg=Magenta ctermfg=13
+    hi ClangSynDiagsNote            guifg=Gray    ctermfg=8
+    hi ClangSynDiagsPosition        guifg=Green   ctermfg=10
+  endif
 
   " back to current window
   exe bufwinnr(l:cbuf) . 'wincmd w'
@@ -547,20 +558,34 @@ func! ClangComplete(findstart, base)
       let b:lineat_old = b:lineat
       let b:compat_old = b:compat
       let b:line_old   = b:line[0 : b:compat-2]
+      
+      " Redir clang diagnostics into a tempfile.
+      " Fix stdout/stderr buffer flush bug? of clang, that COMPLETIONs are not
+      " flushed line by line when not output to a terminal.
+      let l:tmp = tempname()
+      if !empty(l:tmp)
+        let l:command .= ' 2>' . l:tmp
+      endif
       let b:clang_output = split(system(l:command), "\n")
       
-      " Completions always comes after errors and warnings
       let l:i = 0
-      let b:diags = []
-      for l:line in b:clang_output
-        if l:line =~# '^COMPLETION:' " parse completions
-          break
-        else " Write info to split window
-          call add(b:diags, l:line)
-        endif
-        let l:i += 1
-      endfor
+      if !empty(l:tmp)
+        let b:diags = readfile(l:tmp)
+        call delete(l:tmp)
+      else
+        " Completions always comes after errors and warnings
+        let b:diags = []
+        for l:line in b:clang_output
+          if l:line =~# '^COMPLETION:' " parse completions
+            break
+          else " Write info to split window
+            call add(b:diags, l:line)
+          endif
+          let l:i += 1
+        endfor
+      endif
       
+      " The last item in b:diags is statistics for diagnostics
       " FIXME add warning and note ?
       if !empty(b:diags) && b:diags[-1] =~ 'error'
         let b:diags_haserr = 1
@@ -575,6 +600,7 @@ func! ClangComplete(findstart, base)
    
     let l:res = []
     let l:has_preview = &completeopt =~# 'preview'
+    
     for l:line in b:clang_output
       let l:s = stridx(l:line, ':', 13)
       let l:word  = l:line[12 : l:s-2]
