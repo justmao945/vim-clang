@@ -241,7 +241,7 @@ func! s:ShrinkPrevieWindow()
   if l:cft !=# &filetype
     exe 'set filetype=' . l:cft
     setl nobuflisted
-    exe 'file Prototypes@' . bufnr('%')
+    setl statusline=Prototypes
   endif
 
   " back to current window
@@ -376,7 +376,7 @@ func! s:ShowDiagnostics(diags, mode, maxheight)
   endif
 
   " change file name to the last line of diags and goto line 1
-  exe 'file ' . escape(l:diags[-1], ' \') . '@' . l:diags_bufnr
+  exe 'setl statusline=' . escape(l:diags[-1], ' \')
 
   " back to current window
   exe bufwinnr(l:cbuf) . 'wincmd w'
