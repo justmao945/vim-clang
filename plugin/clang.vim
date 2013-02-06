@@ -497,8 +497,7 @@ endf
 " More about @findstart and @base to check :h omnifunc
 "
 " FIXME Tabs can't work corrently at ... =~ '\s' ?
-"
-" TODO Cross line completion ? Because C/C++ is not strict with ` ` and '\n'
+" `set expandtab` is recommended
 "
 func! ClangComplete(findstart, base)
   if a:findstart
@@ -588,6 +587,7 @@ func! ClangComplete(findstart, base)
       if !empty(l:tmp)
         let l:command .= ' 2>' . l:tmp
       endif
+      "echo l:command
       let b:clang_output = split(system(l:command), "\n")
       exe 'lcd ' . l:cwd
       
