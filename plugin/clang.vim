@@ -58,9 +58,9 @@
 "       Clang default header file name to generate PCH. Clang will find the
 "       stdafx header to speed up completion.
 "       Default: stdafx.h
-"       Note: Only find this file in current dir ".", parent dir ".." and last 
-"             in "../include" dir. If it is not in mentioned dirs, it must be 
-"             defined in the dotclang file "-include-pch /path/to/stdafx.h.pch"
+"       Note: Only find this file in clang root and its sub directory "include".
+"             If it is not in mentioned dirs, it must be defined in the dotclang
+"             file "-include-pch /path/to/stdafx.h.pch".
 "             Additionally, only find PCH file stdafx for C++, but not for C.
 "
 " Commands:
@@ -80,8 +80,8 @@
 "
 " TODO:
 "   1. Private members filter
-"   4. Remove OmniComplete .... Pattern Not Found error?...
-"   5. Test cases
+"   2. Remove OmniComplete .... Pattern Not Found error?...
+"   3. Test cases
 "
 " Issues:
 "   1. When complete an identifier only has a char, the char will be deleted by
@@ -172,7 +172,7 @@ func! s:DiscoverIncludeDirs(clang, options)
   let l:clang_output = l:clang_output[l:i+1 : -1]
   let l:res = []
   for l:line in l:clang_output
-    if l:line[0] == ' '   " FIXME Not sure dirs start with a space?
+    if l:line[0] == ' '
       call add(l:res, l:line[1:-1])
     elseif l:line =~# '^End'
       break
@@ -202,12 +202,7 @@ func! s:GenPCH(clang, options, header)
           \ "&Yes\n&No", 2)
     if cho != 1 | return | endif
   endif
-
-  let l:pwd = fnamemodify(l:header, ':p:h')
-  if !empty(l:pwd)
-    exe 'cd ' . l:pwd
-  endif
-
+  
   let l:command = a:clang . ' -cc1 ' . a:options .
         \ ' -emit-pch -o ' . l:header.'.pch ' . l:header
   let l:clang_output = system(l:command)
@@ -256,25 +251,40 @@ endf
 
 
 " {{{ s:Complete[Dot|Arrow|Colon]
-" Tigger g:clang_auto_cmd when cursor is after . -> and ::
-"
-func! s:CompleteDot()
-  if g:clang_auto && getline('.') !~# '^\s*\(#include\)\|\(//\)'
-    return '.' . g:clang_auto_cmd
+" Tigger a:cmd when cursor is after . -> and ::
+
+function! s:ShouldComplete()
+  if getline('.') =~ '\<#\s*\%(include\|import\)'
+    return 0
+  endif
+  if col('.') == 1
+    return 1
+  endif
+  for id in synstack(line('.'), col('.') - 1)
+    if synIDattr(id, 'name') =~ '\CComment\|String\|Number'
+      return 0
+    endif
+  endfor
+  return 1
+endfunction
+
+func! s:CompleteDot(cmd)
+  if s:ShouldComplete()
+    return '.' . a:cmd
   endif
   return '.'
 endf
 
-func! s:CompleteArrow()
-  if g:clang_auto && getline('.')[col('.') - 2] == '-'
-    return '>' . g:clang_auto_cmd
+func! s:CompleteArrow(cmd)
+  if s:ShouldComplete() && getline('.')[col('.') - 2] == '-'
+    return '>' . a:cmd
   endif
   return '>'
 endf
 
-func! s:CompleteColon()
-  if g:clang_auto && getline('.')[col('.') - 2] == ':'
-    return ':' . g:clang_auto_cmd
+func! s:CompleteColon(cmd)
+  if s:ShouldComplete() && getline('.')[col('.') - 2] == ':'
+    return ':' . a:cmd
   endif
   return ':'
 endf
@@ -347,8 +357,6 @@ func! s:ShowDiagnostics(diags, mode, maxheight)
   endfor
 
   silent 1
-  " change file name to the last line of diags and goto line 1
-  exe 'file ' . escape(l:diags[-1], ' \') . '@' . l:diags_bufnr
     
   if l:isnewbuf
     setl buftype=nofile bufhidden=hide
@@ -367,6 +375,9 @@ func! s:ShowDiagnostics(diags, mode, maxheight)
     hi ClangSynDiagsPosition        guifg=Green   ctermfg=10
   endif
 
+  " change file name to the last line of diags and goto line 1
+  exe 'file ' . escape(l:diags[-1], ' \') . '@' . l:diags_bufnr
+
   " back to current window
   exe bufwinnr(l:cbuf) . 'wincmd w'
 endf
@@ -382,20 +393,25 @@ endf
 "   4. setup buffer maps to auto completion
 "
 func! s:ClangCompleteInit()
-  let l:dotclang = findfile(g:clang_dotfile, expand('%:p:h') . ';')
-
-  " clang root(aka .clang located directory) for current buffer
-  " or empty that means $HOME
-  let b:clang_root = fnamemodify(l:dotclang, ':p:h')
+  let l:cwd = getcwd()
+  let l:fwd = expand('%:p:h')
+  exe 'lcd ' . l:fwd
+  let l:dotclang = findfile(g:clang_dotfile, '.;')
 
   " Firstly, add clang options for current buffer file
   let b:clang_options = ''
+
+  " clang root(aka .clang located directory) for current buffer
   if filereadable(l:dotclang)
+    let b:clang_root = fnamemodify(l:dotclang, ':p:h')
     let l:opts = readfile(l:dotclang)
     for l:opt in l:opts
       let b:clang_options .= ' ' . l:opt
     endfor
+  else " or means source file directory
+    let b:clang_root = l:fwd
   endif
+  exe 'lcd '.l:cwd
 
   " Secondly, add options defined by user
   if &filetype == 'c'
@@ -417,27 +433,27 @@ func! s:ClangCompleteInit()
   com! -nargs=* ClangGenPCHFromFile
         \ call <SID>GenPCH(g:clang_exec, b:clang_options_noPCH, <f-args>)
 
-  " try to find PCH files in ., .., and ../include
+  " try to find PCH files in clang_root and clang_root/include
   " Or add `-include-pch /path/to/x.h.pch` into the root file .clang manully
   if &filetype ==# 'cpp' && b:clang_options !~# '-include-pch'
-    let l:pwd = expand('%:p:h')
-    let l:afx = findfile(g:clang_stdafx_h,
-          \ join([l:pwd, l:pwd.'/..', l:pwd.'/../include'], ','))
-    
-    let l:afxpch = l:afx . '.pch'
-    if filereadable(l:afxpch)
-      let b:clang_options .= ' -include-pch ' . l:afxpch
+    let l:cwd = getcwd()
+    exe 'lcd ' . b:clang_root
+    let l:afx = findfile(g:clang_stdafx_h, '.;./include') . '.pch'
+    if filereadable(l:afx)
+      let b:clang_options .= ' -include-pch ' . l:afx
     endif
+    exe 'lcd '.l:cwd
   endif
 
   setl completefunc=ClangComplete
   setl omnifunc=ClangComplete
 
-  " Auto completion
-  inoremap <expr> <buffer> . <SID>CompleteDot()
-  inoremap <expr> <buffer> > <SID>CompleteArrow()
-  if &filetype == 'cpp'
-    inoremap <expr> <buffer> : <SID>CompleteColon()
+  if g:clang_auto   " Auto completion
+    inoremap <expr> <buffer> . <SID>CompleteDot(g:clang_auto_cmd)
+    inoremap <expr> <buffer> > <SID>CompleteArrow(g:clang_auto_cmd)
+    if &filetype == 'cpp'
+      inoremap <expr> <buffer> : <SID>CompleteColon(g:clang_auto_cmd)
+    endif
   endif
 
   " Automatically resize preview window after completion.
@@ -555,10 +571,12 @@ func! ClangComplete(findstart, base)
           \ || b:lineat_old != b:lineat
           \ || b:line_old !=# b:line[0 : b:compat-2]
           \ || b:diags_haserr
-      exe 'cd ' . b:clang_root
+      let l:cwd = getcwd()
+      exe 'lcd ' . b:clang_root
+      let l:src = expand('%:p:.')
       let l:command = g:clang_exec.' -cc1 -fsyntax-only -code-completion-macros'
-            \ .' -code-completion-at='.expand('%:p').':'.b:lineat.':'.b:compat
-            \ .' '.b:clang_options.' '.expand('%:p')
+            \ .' -code-completion-at='.l:src.':'.b:lineat.':'.b:compat
+            \ .' '.b:clang_options.' '.l:src
       let b:lineat_old = b:lineat
       let b:compat_old = b:compat
       let b:line_old   = b:line[0 : b:compat-2]
@@ -571,6 +589,7 @@ func! ClangComplete(findstart, base)
         let l:command .= ' 2>' . l:tmp
       endif
       let b:clang_output = split(system(l:command), "\n")
+      exe 'lcd ' . l:cwd
       
       let l:i = 0
       if !empty(l:tmp)
@@ -590,8 +609,7 @@ func! ClangComplete(findstart, base)
       endif
       
       " The last item in b:diags is statistics for diagnostics
-      " FIXME add warning and note ?
-      if !empty(b:diags) && b:diags[-1] =~ 'error'
+      if !empty(b:diags) && b:diags[-1] =~ 'error\|warning'
         let b:diags_haserr = 1
       else
         let b:diags_haserr = 0
@@ -623,7 +641,6 @@ func! ClangComplete(findstart, base)
             \ 'dup' : 1 })
       elseif !empty(l:res) " overload functions, for C++
         let l:res[-1]['info'] .= "\n" . l:proto
-      else
       endif
     endfor
     return l:res
