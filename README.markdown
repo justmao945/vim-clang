@@ -56,7 +56,7 @@ Options and Commands
 See file `plugin/clang.vim`
 
 
-Screen shots
+Screenshots
 -------------
 
 #### Complete C source
