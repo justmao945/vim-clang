@@ -31,13 +31,13 @@
 "       Default: 'clang'
 "       Note: Use this if clang has a non-standard name, or isn't in the path.
 "  
-"  - g:clang_diags
+"  - g:clang_diagsopt
 "       This option is a string combined with split mode, colon, and max height
 "       of split window. Colon and max height are optional.
 "       e.g.
-"         let g:clang_diags = 'b:rightbelow:6'
-"         let g:clang_diags = 'b:rightbelow'
-"         let g:clang_diags = ''   " <- this disable diagnostics
+"         let g:clang_diagsopt = 'b:rightbelow:6'
+"         let g:clang_diagsopt = 'b:rightbelow'
+"         let g:clang_diagsopt = ''   " <- this disable diagnostics
 "       If it equals '', disable clang diagnostics after completion, otherwise
 "       diagnostics will be put in a split window/viewport.
 "       Split policy indicators and their corresponding modes are:
@@ -125,8 +125,8 @@ if !exists('g:clang_exec')
   let g:clang_exec = 'clang'
 endif
 
-if !exists('g:clang_diags')
-  let g:clang_diags = 'b:rightbelow:6'
+if !exists('g:clang_diagsopt')
+  let g:clang_diagsopt = 'b:rightbelow:6'
 endif
 
 if !exists('g:clang_stdafx_h')
@@ -253,7 +253,7 @@ endf
 " {{{ s:Complete[Dot|Arrow|Colon]
 " Tigger a:cmd when cursor is after . -> and ::
 
-function! s:ShouldComplete()
+func! s:ShouldComplete()
   if getline('.') =~ '\<#\s*\%(include\|import\)'
     return 0
   endif
@@ -266,7 +266,7 @@ function! s:ShouldComplete()
     endif
   endfor
   return 1
-endfunction
+endf
 
 func! s:CompleteDot(cmd)
   if s:ShouldComplete()
@@ -315,21 +315,18 @@ func! s:ShowDiagnostics(diags, mode, maxheight)
   
   " according to mode, create t: or b: var
   let l:p = a:mode[0]
-  if !exists(l:p.':diags_bufnr') || !bufexists(eval(l:p.':diags_bufnr'))
-    exe "let ".l:p.":diags_bufnr = bufnr('ClangDiagnostics@" .
+  if !exists(l:p.':clang_diags_bufnr') || !bufexists(eval(l:p.':clang_diags_bufnr'))
+    exe "let ".l:p.":clang_diags_bufnr = bufnr('ClangDiagnostics@" .
           \ last_buffer_nr() . "', 1)"
-    let l:isnewbuf = 1
-  else
-    let l:isnewbuf = 0
   endif
-  let l:diags_bufnr = eval(l:p.':diags_bufnr')
+  let l:diags_bufnr = eval(l:p.':clang_diags_bufnr')
   let l:sp = a:mode[2:-1]
   let l:cbuf = bufnr('%')
 
   let l:diags_winnr = bufwinnr(l:diags_bufnr)
   if l:diags_winnr == -1
     if !empty(l:diags)  " split a new window
-      exe 'silent keepalt keepjumps ' .l:sp. ' sbuffer ' .l:diags_bufnr
+      exe 'silent keepalt keepjumps keepmarks ' .l:sp. ' sbuffer ' .l:diags_bufnr
     else
       return
     endif
@@ -356,30 +353,29 @@ func! s:ShowDiagnostics(diags, mode, maxheight)
     call append(line('$')-1, l:line)
   endfor
 
-  silent 1
+  silent 1 " goto the 1st line
     
-  if l:isnewbuf
-    setl buftype=nofile bufhidden=hide
-    setl noswapfile nobuflisted nowrap nonumber nospell noinsertmode nomodifiable
-    setl cursorline
-    setl colorcolumn=-1
-    
-    syn match ClangSynDiagsError    display 'error:'
-    syn match ClangSynDiagsWarning  display 'warning:'
-    syn match ClangSynDiagsNote     display 'note:'
-    syn match ClangSynDiagsPosition display '^\s*[~^ ]\+$'
-    
-    hi ClangSynDiagsError           guifg=Red     ctermfg=9
-    hi ClangSynDiagsWarning         guifg=Magenta ctermfg=13
-    hi ClangSynDiagsNote            guifg=Gray    ctermfg=8
-    hi ClangSynDiagsPosition        guifg=Green   ctermfg=10
-  endif
+  setl buftype=nofile bufhidden=hide
+  setl noswapfile nobuflisted nowrap nonumber nospell noinsertmode nomodifiable
+  setl cursorline
+  setl colorcolumn=-1
+  
+  syn match ClangSynDiagsError    display 'error:'
+  syn match ClangSynDiagsWarning  display 'warning:'
+  syn match ClangSynDiagsNote     display 'note:'
+  syn match ClangSynDiagsPosition display '^\s*[~^ ]\+$'
+  
+  hi ClangSynDiagsError           guifg=Red     ctermfg=9
+  hi ClangSynDiagsWarning         guifg=Magenta ctermfg=13
+  hi ClangSynDiagsNote            guifg=Gray    ctermfg=8
+  hi ClangSynDiagsPosition        guifg=Green   ctermfg=10
 
   " change file name to the last line of diags and goto line 1
   exe 'setl statusline=' . escape(l:diags[-1], ' \')
 
   " back to current window
   exe bufwinnr(l:cbuf) . 'wincmd w'
+  
 endf
 "}}}
 
@@ -456,19 +452,42 @@ func! s:ClangCompleteInit()
     endif
   endif
 
-  " Automatically resize preview window after completion.
-  " Default assume preview window is above of the editing window.
-  au CompleteDone <buffer> call <SID>ShrinkPrevieWindow()
+  " CompleteDone event is available since version 7.3.598
+  if exists("##CompleteDone")
+    " Automatically resize preview window after completion.
+    " Default assume preview window is above of the editing window.
+    au CompleteDone <buffer> call <SID>ShrinkPrevieWindow()
+  else
+    let b:clang_isCompleteDone_0 = 0
+    au CursorMovedI <buffer>
+          \ if b:clang_isCompleteDone_0 |
+          \   call <SID>ShrinkPrevieWindow() |
+          \   let b:clang_isCompleteDone_0 = 0 |
+          \ endif
+  endif
 
-  " Automatically show clang diagnostics after completion.
   " Window is shared by buffers in the same tabpage,
   " and viewport is private for every source buffer.
-  " Note: b:diags is created in ClangComplete(...)
-  if g:clang_diags =~# '^[bt]:[a-z]\+\(:[0-9]\+\)\?$'
-    let s:i = stridx(g:clang_diags, ':', 2)
-    let b:diags = []
-    au CompleteDone <buffer> call <SID>ShowDiagnostics(b:diags,
-        \ g:clang_diags[0 : s:i-1], g:clang_diags[s:i+1 : -1])
+  " Note: b:clang_diags is created in ClangComplete(...)
+  if g:clang_diagsopt =~# '^[bt]:[a-z]\+\(:[0-9]\+\)\?$'
+    let s:cd_i = stridx(g:clang_diagsopt, ':', 2)
+    let s:cd_mode   = g:clang_diagsopt[0 : s:cd_i-1]
+    let s:cd_height = g:clang_diagsopt[s:cd_i+1 : -1]
+    let b:clang_diags = []
+    if exists("##CompleteDone")
+      " Automatically show clang diagnostics after completion.
+      au CompleteDone <buffer> 
+            \ call <SID>ShowDiagnostics(b:clang_diags, s:cd_mode, s:cd_height)
+    else
+      " FIXME I don't know why VIM escapes after press a key when the
+      " completion pattern not found...
+      let b:clang_isCompleteDone_1 = 0
+      au CursorMovedI <buffer>
+            \ if b:clang_isCompleteDone_1 |
+            \   call <SID>ShowDiagnostics(b:clang_diags, s:cd_mode, s:cd_height) |
+            \   let b:clang_isCompleteDone_1 = 0 |
+            \ endif
+    endif
   endif
 endf
 "}}}
@@ -478,7 +497,7 @@ endf
 " Complete main routine, valid cases are showed as below.
 " Note: 1. This will not parse previous lines, which means that only care
 "       current line.
-"       2. Clang diagnostics will be saved to b:diags after completion.
+"       2. Clang diagnostics will be saved to b:clang_diags after completion.
 "
 " <IDENT> indicates an identifier
 " </> the completion point
@@ -501,60 +520,60 @@ endf
 "
 func! ClangComplete(findstart, base)
   if a:findstart
-    let b:line = getline('.')
+    let b:clang_line = getline('.')
     let l:start = col('.') - 1 " start column
     
     "trim right spaces
-    while l:start > 0 && b:line[l:start - 1] =~ '\s'
+    while l:start > 0 && b:clang_line[l:start - 1] =~ '\s'
       let l:start -= 1
     endwhile
     
     let l:col = l:start
-    while l:col > 0 && b:line[l:col - 1] =~# '[_0-9a-zA-Z]'  " find valid ident
+    while l:col > 0 && b:clang_line[l:col - 1] =~# '[_0-9a-zA-Z]'  " find valid ident
       let l:col -= 1
     endwhile
     
-    let b:base = ''  " base word to filter completions
+    let b:clang_baseword = ''  " base word to filter completions
     if l:col < l:start " may exist <IDENT>
-      if b:line[l:col] =~# '[_a-zA-Z]' "<ident> doesn't start with a number
-        let b:base   = b:line[l:col : l:start-1]
+      if b:clang_line[l:col] =~# '[_a-zA-Z]' "<ident> doesn't start with a number
+        let b:clang_baseword   = b:clang_line[l:col : l:start-1]
         let l:start  = l:col " reset l:start in case 1
       else
         echo 'Can not complete after an invalid identifier <'
-            \. b:line[l:col : l:start-1] . '>'
+            \. b:clang_line[l:col : l:start-1] . '>'
         return -3
       endif
     endif
     
     " trim right spaces
-    while l:col > 0 && b:line[l:col -1] =~ '\s'
+    while l:col > 0 && b:clang_line[l:col -1] =~ '\s'
       let l:col -= 1
     endwhile
    
     let l:ismber = 0
-    if b:line[l:col - 1] == '.'
-        \ || (b:line[l:col - 1] == '>' && b:line[l:col - 2] == '-')
+    if b:clang_line[l:col - 1] == '.'
+        \ || (b:clang_line[l:col - 1] == '>' && b:clang_line[l:col - 2] == '-')
         \ || (&filetype == 'cpp' && 
-        \     b:line[l:col - 1] == ':' && b:line[l:col - 2] == ':')
+        \     b:clang_line[l:col - 1] == ':' && b:clang_line[l:col - 2] == ':')
       let l:start  = l:col
       let l:col -= 2
       let l:ismber = 1
     endif
-    if b:line[l:col - 1] == '.'
+    if b:clang_line[l:col - 1] == '.'
       let l:col += 1
     endif
     
     "Noting to complete, pattern completion is not supported...
-    if ! l:ismber && empty(b:base)
+    if ! l:ismber && empty(b:clang_baseword)
       return -3
     endif
     
     " buggy when update in the second phase ?
     silent update
-    let b:compat = l:start + 1
+    let b:clang_compat = l:start + 1
     return l:start
   else
-    let b:lineat = line('.')
+    let b:clang_lineat = line('.')
     
     " Cache parsed result into b:clang_output
     " Reparse source file when:
@@ -566,19 +585,19 @@ func! ClangComplete(findstart, base)
     " completion point is same with old one.
     " Someting like md5sum to check source ?
     if !exists('b:clang_output')
-          \ || b:compat_old != b:compat
-          \ || b:lineat_old != b:lineat
-          \ || b:line_old !=# b:line[0 : b:compat-2]
-          \ || b:diags_haserr
+          \ || b:clang_compat_old !=  b:clang_compat
+          \ || b:clang_lineat_old !=  b:clang_lineat
+          \ || b:clang_line_old   !=# b:clang_line[0 : b:clang_compat-2]
+          \ || b:clang_diags_haserr
       let l:cwd = getcwd()
       exe 'lcd ' . b:clang_root
       let l:src = expand('%:p:.')
       let l:command = g:clang_exec.' -cc1 -fsyntax-only -code-completion-macros'
-            \ .' -code-completion-at='.l:src.':'.b:lineat.':'.b:compat
+            \ .' -code-completion-at='.l:src.':'.b:clang_lineat.':'.b:clang_compat
             \ .' '.b:clang_options.' '.l:src
-      let b:lineat_old = b:lineat
-      let b:compat_old = b:compat
-      let b:line_old   = b:line[0 : b:compat-2]
+      let b:clang_lineat_old = b:clang_lineat
+      let b:clang_compat_old = b:clang_compat
+      let b:clang_line_old   = b:clang_line[0 : b:clang_compat-2]
       
       " Redir clang diagnostics into a tempfile.
       " Fix stdout/stderr buffer flush bug? of clang, that COMPLETIONs are not
@@ -593,26 +612,26 @@ func! ClangComplete(findstart, base)
       
       let l:i = 0
       if !empty(l:tmp)
-        let b:diags = readfile(l:tmp)
+        let b:clang_diags = readfile(l:tmp)
         call delete(l:tmp)
       else
         " Completions always comes after errors and warnings
-        let b:diags = []
+        let b:clang_diags = []
         for l:line in b:clang_output
           if l:line =~# '^COMPLETION:' " parse completions
             break
           else " Write info to split window
-            call add(b:diags, l:line)
+            call add(b:clang_diags, l:line)
           endif
           let l:i += 1
         endfor
       endif
       
-      " The last item in b:diags is statistics for diagnostics
-      if !empty(b:diags) && b:diags[-1] =~ 'error\|warning'
-        let b:diags_haserr = 1
+      " The last item in b:clang_diags is statistics for diagnostics
+      if !empty(b:clang_diags) && b:clang_diags[-1] =~ 'error\|warning'
+        let b:clang_diags_haserr = 1
       else
-        let b:diags_haserr = 0
+        let b:clang_diags_haserr = 0
       endif
       
       if l:i > 0
@@ -628,7 +647,7 @@ func! ClangComplete(findstart, base)
       let l:word  = l:line[12 : l:s-2]
       let l:proto = l:line[l:s+2 : -1]
       
-      if l:word !~# '^' . b:base || l:word =~# '(Hidden)$'
+      if l:word !~# '^' . b:clang_baseword || l:word =~# '(Hidden)$'
         continue
       endif
       
@@ -643,6 +662,11 @@ func! ClangComplete(findstart, base)
         let l:res[-1]['info'] .= "\n" . l:proto
       endif
     endfor
+    
+    " Simulate CompleteDone event, see ClangCompleteInit()
+    let b:clang_isCompleteDone_0 = 1
+    let b:clang_isCompleteDone_1 = 1
+    
     return l:res
   endif
 endf
