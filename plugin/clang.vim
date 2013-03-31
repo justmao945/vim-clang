@@ -173,7 +173,7 @@ func! s:DiscoverIncludeDirs(clang, options)
   let l:res = []
   for l:line in l:clang_output
     if l:line[0] == ' '
-      call add(l:res, l:line[1:-1])
+      call add(l:res, '"' . l:line[1:-1] . '"')
     elseif l:line =~# '^End'
       break
     endif
@@ -600,9 +600,11 @@ func! ClangComplete(findstart, base)
       let b:clang_line_old   = b:clang_line[0 : b:clang_compat-2]
       
       " Redir clang diagnostics into a tempfile.
-      " Fix stdout/stderr buffer flush bug? of clang, that COMPLETIONs are not
-      " flushed line by line when not output to a terminal.
+      " * Fix stdout/stderr buffer flush bug? of clang, that COMPLETIONs are not
+      "   flushed line by line when not output to a terminal.
+      " * clang on Win32 will not redirect errors to stderr?
       let l:tmp = tempname()
+      if has('win32') | let l:tmp='' | endif
       if !empty(l:tmp)
         let l:command .= ' 2>' . l:tmp
       endif
@@ -610,6 +612,7 @@ func! ClangComplete(findstart, base)
       let b:clang_output = split(system(l:command), "\n")
       exe 'lcd ' . l:cwd
       
+      "echo b:clang_output
       let l:i = 0
       if !empty(l:tmp)
         let b:clang_diags = readfile(l:tmp)
