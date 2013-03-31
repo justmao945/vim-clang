@@ -59,7 +59,7 @@ See file `plugin/clang.vim`
 Windows support
 --------------------
 I don't know if some people would like to use VIM + Clang comppletion on Micorsot Windows,
-as many good IDE(e.g. Virtual Studio, VC++ expres etc.) provide better experience.
+as many good IDE(e.g. Visual Studio, VC++ express etc.) provide better experience.
 Another reason is that Windows is not the first class platform supported by Clang.
 But as the [ishani][2] provides standalone and prebuild Clang binary files,
 which helps a lot on vim-clang support for Windows. Now you can [download][3] the latest prebuild
