@@ -254,7 +254,7 @@ endf
 " Tigger a:cmd when cursor is after . -> and ::
 
 func! s:ShouldComplete()
-  if getline('.') =~ '\<#\s*\%(include\|import\)'
+  if getline('.') =~ '#\s*\(include\|import\)'
     return 0
   endif
   if col('.') == 1
@@ -612,6 +612,7 @@ func! ClangComplete(findstart, base)
       
       let l:i = 0
       if !empty(l:tmp)
+        " FIXME Can't read file in Windows?
         let b:clang_diags = readfile(l:tmp)
         call delete(l:tmp)
       else
@@ -627,7 +628,7 @@ func! ClangComplete(findstart, base)
         endfor
       endif
       
-      " The last item in b:clang_diags is statistics for diagnostics
+      " The last item in b:clang_diags has statistics info of diagnostics
       if !empty(b:clang_diags) && b:clang_diags[-1] =~ 'error\|warning'
         let b:clang_diags_haserr = 1
       else
@@ -663,7 +664,8 @@ func! ClangComplete(findstart, base)
       endif
     endfor
     
-    " Simulate CompleteDone event, see ClangCompleteInit()
+    " Simulate CompleteDone event, see ClangCompleteInit().
+    " b:clang_isCompleteDone_X is valid only when CompleteDone event is not available.
     let b:clang_isCompleteDone_0 = 1
     let b:clang_isCompleteDone_1 = 1
     
