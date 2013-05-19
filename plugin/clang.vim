@@ -356,7 +356,7 @@ func! s:ShowDiagnostics(diags, mode, maxheight)
   silent 1 " goto the 1st line
     
   setl buftype=nofile bufhidden=hide
-  setl noswapfile nobuflisted nowrap nonumber nospell noinsertmode nomodifiable
+  setl noswapfile nobuflisted nowrap nonumber nospell nomodifiable
   setl cursorline
   setl colorcolumn=-1
   
