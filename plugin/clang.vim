@@ -223,20 +223,15 @@ endf
 " Shrink preview window to fit lines.
 " Assume cursor is in the editing window, and preview window is above of it.
 func! s:ShrinkPrevieWindow()
-  if &completeopt !~# 'preview'
+  if &completeopt !~# 'preview' || !exists("t:clang_hasPreview")
     return
   endif
 
-  "current window
+  "current view
   let l:cbuf = bufnr('%')
   let l:cft  = &filetype
-  wincmd k
-  " There's no window above current window
-  if bufnr('%') == l:cbuf
-    return
-  endif
-  
-  " new window
+
+  wincmd k " go to above view
   exe 'resize ' . (line('$') - 1)
   if l:cft !=# &filetype
     exe 'set filetype=' . l:cft
@@ -671,6 +666,13 @@ func! ClangComplete(findstart, base)
     " b:clang_isCompleteDone_X is valid only when CompleteDone event is not available.
     let b:clang_isCompleteDone_0 = 1
     let b:clang_isCompleteDone_1 = 1
+    
+    pclose " close preview window before completion
+    if len(l:res) > 0
+      let t:clang_hasPreview = 1
+    else
+      unlet t:clang_hasPreview
+    endif
     
     return l:res
   endif
