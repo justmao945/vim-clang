@@ -223,7 +223,7 @@ endf
 " Shrink preview window to fit lines.
 " Assume cursor is in the editing window, and preview window is above of it.
 func! s:ShrinkPrevieWindow()
-  if &completeopt !~# 'preview' || !exists("t:clang_hasPreview")
+  if &completeopt !~# 'preview'
     return
   endif
 
@@ -232,17 +232,35 @@ func! s:ShrinkPrevieWindow()
   let l:cft  = &filetype
 
   wincmd k " go to above view
-  exe 'resize ' . (line('$') - 1)
-  if l:cft !=# &filetype
-    exe 'set filetype=' . l:cft
-    setl nobuflisted
-    setl statusline=Prototypes
+  if( &previewwindow )
+    exe 'resize ' . (line('$') - 1)
+    if l:cft !=# &filetype
+      exe 'set filetype=' . l:cft
+      setl nobuflisted
+      setl statusline=Prototypes
+    endif
   endif
 
   " back to current window
   exe bufwinnr(l:cbuf) . 'wincmd w'
 endf
 "}}}
+
+
+" {{{ s:HasPreviewAbove
+" 
+" Detect above view is preview window or not.
+"
+func! s:HasPreviewAbove()
+  let l:cbuf = bufnr('%')
+  let l:has = 0
+  wincmd k  " goto above
+  if &previewwindow
+    let l:has = 1
+  endif
+  exe bufwinnr(l:cbuf) . 'wincmd w'
+  return l:has
+endf
 
 
 " {{{ s:Complete[Dot|Arrow|Colon]
@@ -667,11 +685,8 @@ func! ClangComplete(findstart, base)
     let b:clang_isCompleteDone_0 = 1
     let b:clang_isCompleteDone_1 = 1
     
-    pclose " close preview window before completion
-    if len(l:res) > 0
-      let t:clang_hasPreview = 1
-    else
-      unlet t:clang_hasPreview
+    if &completeopt =~# 'preview' && ! <SID>HasPreviewAbove()
+      pclose " close preview window before completion
     endif
     
     return l:res
