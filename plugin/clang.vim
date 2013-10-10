@@ -261,20 +261,21 @@ func! s:HasPreviewAbove()
   exe bufwinnr(l:cbuf) . 'wincmd w'
   return l:has
 endf
+"}}}
 
 
 " {{{ s:Complete[Dot|Arrow|Colon]
 " Tigger a:cmd when cursor is after . -> and ::
 
 func! s:ShouldComplete()
-  if getline('.') =~ '#\s*\(include\|import\)'
+  if getline('.') =~ '#\s*\(include\|import\)' || getline('.')[col('.') - 2] == "'"
     return 0
   endif
   if col('.') == 1
     return 1
   endif
   for id in synstack(line('.'), col('.') - 1)
-    if synIDattr(id, 'name') =~ '\CComment\|String\|Number'
+    if synIDattr(id, 'name') =~ 'Comment\|String\|Number\|Char\|Label\|Special'
       return 0
     endif
   endfor
