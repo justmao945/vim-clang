@@ -173,7 +173,7 @@ func! s:DiscoverIncludeDirs(clang, options)
   let l:res = []
   for l:line in l:clang_output
     if l:line[0] == ' '
-      call add(l:res, '"' . l:line[1:-1] . '"')
+      call add(l:res, fnameescape(l:line[1:-1]))
     elseif l:line =~# '^End'
       break
     endif
@@ -195,7 +195,7 @@ endf
 " @return  Output of clang
 "
 func! s:GenPCH(clang, options, header)
-  let l:header = expand(a:header)
+  let l:header = fnameescape(expand(a:header))
   if l:header !~? '.h'
     let cho = confirm('Not a C/C++ header: ' . l:header . "\n" .
           \ 'Continue to generate PCH file ?',
@@ -403,8 +403,8 @@ endf
 "   4. setup buffer maps to auto completion
 "
 func! s:ClangCompleteInit()
-  let l:cwd = escape(getcwd(), ' ')
-  let l:fwd = expand('%:p:gs?\ ?\\ ?:h')
+  let l:cwd = fnameescape(getcwd())
+  let l:fwd = fnameescape(expand('%:p:h'))
   exe 'lcd ' . l:fwd
   let l:dotclang = findfile(g:clang_dotfile, '.;')
 
@@ -413,7 +413,7 @@ func! s:ClangCompleteInit()
 
   " clang root(aka .clang located directory) for current buffer
   if filereadable(l:dotclang)
-    let b:clang_root = fnamemodify(l:dotclang, ':p:h')
+    let b:clang_root = fnameescape(fnamemodify(l:dotclang, ':p:h'))
     let l:opts = readfile(l:dotclang)
     for l:opt in l:opts
       let b:clang_options .= ' ' . l:opt
@@ -446,11 +446,11 @@ func! s:ClangCompleteInit()
   " try to find PCH files in clang_root and clang_root/include
   " Or add `-include-pch /path/to/x.h.pch` into the root file .clang manully
   if &filetype ==# 'cpp' && b:clang_options !~# '-include-pch'
-    let l:cwd = escape(getcwd(), ' ')
+    let l:cwd = fnameescape(getcwd())
     exe 'lcd ' . b:clang_root
     let l:afx = findfile(g:clang_stdafx_h, '.;./include') . '.pch'
     if filereadable(l:afx)
-      let b:clang_options .= ' -include-pch ' . l:afx
+      let b:clang_options .= ' -include-pch ' . fnameescape(l:afx)
     endif
     exe 'lcd '.l:cwd
   endif
@@ -603,9 +603,9 @@ func! ClangComplete(findstart, base)
           \ || b:clang_lineat_old !=  b:clang_lineat
           \ || b:clang_line_old   !=# b:clang_line[0 : b:clang_compat-2]
           \ || b:clang_diags_haserr
-      let l:cwd = escape(getcwd(), ' ')
+      let l:cwd = fnameescape(getcwd())
       exe 'lcd ' . b:clang_root
-      let l:src = expand('%:p:gs?\ ?\\ ?.')  " Thanks RageCooky, fix when a path has spaces.
+      let l:src = fnameescape(expand('%:p:.'))  " Thanks RageCooky, fix when a path has spaces.
       let l:command = g:clang_exec.' -cc1 -fsyntax-only -code-completion-macros'
             \ .' -code-completion-at='.l:src.':'.b:clang_lineat.':'.b:clang_compat
             \ .' '.b:clang_options.' '.l:src
