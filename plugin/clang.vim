@@ -403,7 +403,7 @@ endf
 "   4. setup buffer maps to auto completion
 "
 func! s:ClangCompleteInit()
-  let l:cwd = '"'.getcwd().'"'
+  let l:cwd = escape(getcwd(), ' ')
   let l:fwd = expand('%:p:gs?\ ?\\ ?:h')
   exe 'lcd ' . l:fwd
   let l:dotclang = findfile(g:clang_dotfile, '.;')
@@ -446,7 +446,7 @@ func! s:ClangCompleteInit()
   " try to find PCH files in clang_root and clang_root/include
   " Or add `-include-pch /path/to/x.h.pch` into the root file .clang manully
   if &filetype ==# 'cpp' && b:clang_options !~# '-include-pch'
-    let l:cwd = '"'.getcwd().'"'
+    let l:cwd = escape(getcwd(), ' ')
     exe 'lcd ' . b:clang_root
     let l:afx = findfile(g:clang_stdafx_h, '.;./include') . '.pch'
     if filereadable(l:afx)
@@ -603,7 +603,7 @@ func! ClangComplete(findstart, base)
           \ || b:clang_lineat_old !=  b:clang_lineat
           \ || b:clang_line_old   !=# b:clang_line[0 : b:clang_compat-2]
           \ || b:clang_diags_haserr
-      let l:cwd = '"'.getcwd().'"'
+      let l:cwd = escape(getcwd(), ' ')
       exe 'lcd ' . b:clang_root
       let l:src = expand('%:p:gs?\ ?\\ ?.')  " Thanks RageCooky, fix when a path has spaces.
       let l:command = g:clang_exec.' -cc1 -fsyntax-only -code-completion-macros'
