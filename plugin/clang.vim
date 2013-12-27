@@ -139,7 +139,7 @@ au FileType c,cpp call <SID>ClangCompleteInit()
 " Output of `echo | clang -c -v -x c++ -`:
 "   clang version ...
 "   Target: ...
-"   Thread mode ...
+"   Thread model: ...
 "    "/usr/bin/clang" -cc1 ....
 "   clang -cc1 version ...
 "   ignoring ..
@@ -154,27 +154,27 @@ au FileType c,cpp call <SID>ClangCompleteInit()
 " @options Additional options passed to clang, e.g. -stdlib=libc++
 " @return List of dirs: ['path1', 'path2', ...]
 func! s:DiscoverIncludeDirs(clang, options)
-  let command = 'echo | ' . a:clang . ' -fsyntax-only -v ' . a:options . ' -'
-  let clang_output = split(system(command), "\n")
+  let l:command = 'echo | ' . a:clang . ' -fsyntax-only -v ' . a:options . ' -'
+  let l:clang_output = split(system(l:command), "\n")
   
-  let i = 0
-  for line in clang_output
-    if line =~# '^#include'
+  let l:i = 0
+  for l:line in l:clang_output
+    if l:line =~# '^#include'
       break
     endif
-    let i += 1
+    let l:i += 1
   endfor
   
-  let clang_output = clang_output[i+1 : -1]
-  let res = []
-  for line in clang_output
-    if line[0] == ' '
-      call add(res, fnameescape(line[1:-1]))
-    elseif line =~# '^End'
+  let l:clang_output = l:clang_output[l:i+1 : -1]
+  let l:res = []
+  for l:line in l:clang_output
+    if l:line[0] == ' '
+      call add(l:res, fnameescape(l:line[1:-1]))
+    elseif l:line =~# '^End'
       break
     endif
   endfor
-  return res
+  return l:res
 endf
 "}}}
 "{{{  s:GenPCH
@@ -189,26 +189,26 @@ endf
 " @return  Output of clang
 "
 func! s:GenPCH(clang, options, header)
-  let header = fnameescape(expand(a:header))
-  if header !~? '.h'
-    let cho = confirm('Not a C/C++ header: ' . header . "\n" .
+  let l:header = fnameescape(expand(a:header))
+  if l:header !~? '.h'
+    let cho = confirm('Not a C/C++ header: ' . l:header . "\n" .
           \ 'Continue to generate PCH file ?',
           \ "&Yes\n&No", 2)
     if cho != 1 | return | endif
   endif
   
-  let command = a:clang . ' -cc1 ' . a:options .
-        \ ' -emit-pch -o ' . header.'.pch ' . header
-  let clang_output = system(command)
+  let l:command = a:clang . ' -cc1 ' . a:options .
+        \ ' -emit-pch -o ' . l:header.'.pch ' . l:header
+  let l:clang_output = system(l:command)
 
   if v:shell_error
     echo 'Clang returns error ' . v:shell_error
-    echo command
-    echo clang_output
+    echo l:command
+    echo l:clang_output
   else
-    echo 'Clang creates PCH flie ' . header . '.pch successfully!'
+    echo 'Clang creates PCH flie ' . l:header . '.pch successfully!'
   endif
-  return clang_output
+  return l:clang_output
 endf
 "}}}
 "{{{ s:ShrinkPrevieWindow
@@ -220,21 +220,21 @@ func! s:ShrinkPrevieWindow()
   endif
 
   "current view
-  let cbuf = bufnr('%')
-  let cft  = &filetype
+  let l:cbuf = bufnr('%')
+  let l:cft  = &filetype
 
   wincmd k " go to above view
   if( &previewwindow )
     exe 'resize ' . (line('$') - 1)
-    if cft !=# &filetype
-      exe 'set filetype=' . cft
+    if l:cft !=# &filetype
+      exe 'set filetype=' . l:cft
       setl nobuflisted
       setl statusline=Prototypes
     endif
   endif
 
   " back to current window
-  exe bufwinnr(cbuf) . 'wincmd w'
+  exe bufwinnr(l:cbuf) . 'wincmd w'
 endf
 "}}}
 " {{{ s:HasPreviewAbove
@@ -242,14 +242,14 @@ endf
 " Detect above view is preview window or not.
 "
 func! s:HasPreviewAbove()
-  let cbuf = bufnr('%')
-  let has = 0
+  let l:cbuf = bufnr('%')
+  let l:has = 0
   wincmd k  " goto above
   if &previewwindow
-    let has = 1
+    let l:has = 1
   endif
-  exe bufwinnr(cbuf) . 'wincmd w'
-  return has
+  exe bufwinnr(l:cbuf) . 'wincmd w'
+  return l:has
 endf
 "}}}
 " {{{ s:Complete[Dot|Arrow|Colon]
@@ -304,53 +304,53 @@ endf
 " @maxheight Maximum window height.
 " @return
 func! s:ShowDiagnostics(diags, mode, maxheight)
-  let diags = a:diags
+  let l:diags = a:diags
 
-  if type(diags) == type('') " diagnostics file name
-    let diags = readfile(diags)
-  elseif type(diags) != type([])
-    echo 'Invalid arg ' . diags
+  if type(l:diags) == type('') " diagnostics file name
+    let l:diags = readfile(l:diags)
+  elseif type(l:diags) != type([])
+    echo 'Invalid arg ' . l:diags
     return
   endif
   
   " according to mode, create t: or b: var
-  let p = a:mode[0]
-  if !exists(p.':clang_diags_bufnr') || !bufexists(eval(p.':clang_diags_bufnr'))
-    exe "let ".p.":clang_diags_bufnr = bufnr('ClangDiagnostics@" .
+  let l:p = a:mode[0]
+  if !exists(l:p.':clang_diags_bufnr') || !bufexists(eval(l:p.':clang_diags_bufnr'))
+    exe "let ".l:p.":clang_diags_bufnr = bufnr('ClangDiagnostics@" .
           \ last_buffer_nr() . "', 1)"
   endif
-  let diags_bufnr = eval(p.':clang_diags_bufnr')
-  let sp = a:mode[2:-1]
-  let cbuf = bufnr('%')
+  let l:diags_bufnr = eval(l:p.':clang_diags_bufnr')
+  let l:sp = a:mode[2:-1]
+  let l:cbuf = bufnr('%')
 
-  let diags_winnr = bufwinnr(diags_bufnr)
-  if diags_winnr == -1
-    if !empty(diags)  " split a new window
-      exe 'silent keepalt keepjumps keepmarks ' .sp. ' sbuffer ' .diags_bufnr
+  let l:diags_winnr = bufwinnr(l:diags_bufnr)
+  if l:diags_winnr == -1
+    if !empty(l:diags)  " split a new window
+      exe 'silent keepalt keepjumps keepmarks ' .l:sp. ' sbuffer ' .l:diags_bufnr
     else
       return
     endif
   else " goto diag window
-    exe diags_winnr . 'wincmd w'
-    if empty(diags) " hide the diag window and !!RETURN!!
+    exe l:diags_winnr . 'wincmd w'
+    if empty(l:diags) " hide the diag window and !!RETURN!!
       hide
       return
     endif
   endif
 
-  let height = len(diags) - 1
-  if a:maxheight < height
-    let height = a:maxheight
+  let l:height = len(l:diags) - 1
+  if a:maxheight < l:height
+    let l:height = a:maxheight
   endif
 
   " the last line will be showed in status line as file name
-  exe 'silent resize '. height
+  exe 'silent resize '. l:height
 
   setl modifiable
   silent 1,$ delete _   " clear buffer before write
   
-  for line in diags
-    call append(line('$')-1, line)
+  for l:line in l:diags
+    call append(line('$')-1, l:line)
   endfor
 
   silent 1 " goto the 1st line
@@ -371,10 +371,10 @@ func! s:ShowDiagnostics(diags, mode, maxheight)
   hi ClangSynDiagsPosition        guifg=Green   ctermfg=10
 
   " change file name to the last line of diags and goto line 1
-  exe 'setl statusline=' . escape(diags[-1], ' \')
+  exe 'setl statusline=' . escape(l:diags[-1], ' \')
 
   " back to current window
-  exe bufwinnr(cbuf) . 'wincmd w'
+  exe bufwinnr(l:cbuf) . 'wincmd w'
   
 endf
 "}}}
@@ -387,25 +387,25 @@ endf
 "   4. setup buffer maps to auto completion
 "
 func! s:ClangCompleteInit()
-  let cwd = fnameescape(getcwd())
-  let fwd = fnameescape(expand('%:p:h'))
-  exe 'lcd ' . fwd
-  let dotclang = findfile(g:clang_dotfile, '.;')
+  let l:cwd = fnameescape(getcwd())
+  let l:fwd = fnameescape(expand('%:p:h'))
+  exe 'lcd ' . l:fwd
+  let l:dotclang = findfile(g:clang_dotfile, '.;')
 
   " Firstly, add clang options for current buffer file
   let b:clang_options = ''
 
   " clang root(aka .clang located directory) for current buffer
-  if filereadable(dotclang)
-    let b:clang_root = fnameescape(fnamemodify(dotclang, ':p:h'))
-    let opts = readfile(dotclang)
-    for opt in opts
-      let b:clang_options .= ' ' . opt
+  if filereadable(l:dotclang)
+    let b:clang_root = fnameescape(fnamemodify(l:dotclang, ':p:h'))
+    let l:opts = readfile(l:dotclang)
+    for l:opt in l:opts
+      let b:clang_options .= ' ' . l:opt
     endfor
   else " or means source file directory
-    let b:clang_root = fwd
+    let b:clang_root = l:fwd
   endif
-  exe 'lcd '.cwd
+  exe 'lcd '.l:cwd
 
   " Secondly, add options defined by user
   if &filetype == 'c'
@@ -415,9 +415,9 @@ func! s:ClangCompleteInit()
   endif
   
   " add include directories
-  let incs = s:DiscoverIncludeDirs(g:clang_exec, b:clang_options)
-  for dir in incs
-    let b:clang_options .= ' -I' . dir
+  let l:incs = s:DiscoverIncludeDirs(g:clang_exec, b:clang_options)
+  for l:dir in l:incs
+    let b:clang_options .= ' -I' . l:dir
   endfor
   
   " backup options without PCH support
@@ -430,13 +430,13 @@ func! s:ClangCompleteInit()
   " try to find PCH files in clang_root and clang_root/include
   " Or add `-include-pch /path/to/x.h.pch` into the root file .clang manully
   if &filetype ==# 'cpp' && b:clang_options !~# '-include-pch'
-    let cwd = fnameescape(getcwd())
+    let l:cwd = fnameescape(getcwd())
     exe 'lcd ' . b:clang_root
-    let afx = findfile(g:clang_stdafx_h, '.;./include') . '.pch'
-    if filereadable(afx)
-      let b:clang_options .= ' -include-pch ' . fnameescape(afx)
+    let l:afx = findfile(g:clang_stdafx_h, '.;./include') . '.pch'
+    if filereadable(l:afx)
+      let b:clang_options .= ' -include-pch ' . fnameescape(l:afx)
     endif
-    exe 'lcd '.cwd
+    exe 'lcd '.l:cwd
   endif
 
   setl completefunc=ClangComplete
@@ -502,49 +502,49 @@ endf
 " @return [start, base] start is used by omni and base is used to filter
 " completion result
 func! s:ParseCompletePoint()
-    let line = getline('.')
-    let start = col('.') - 1 " start column
+    let l:line = getline('.')
+    let l:start = col('.') - 1 " start column
     
     "trim right spaces
-    while start > 0 && line[start - 1] =~ '\s'
-      let start -= 1
+    while l:start > 0 && l:line[l:start - 1] =~ '\s'
+      let l:start -= 1
     endwhile
     
-    let col = start
-    while col > 0 && line[col - 1] =~# '[_0-9a-zA-Z]'  " find valid ident
-      let col -= 1
+    let l:col = l:start
+    while l:col > 0 && l:line[l:col - 1] =~# '[_0-9a-zA-Z]'  " find valid ident
+      let l:col -= 1
     endwhile
     
-    let base = ''  " end of base word to filter completions
-    if col < start " may exist <IDENT>
-      if line[col] =~# '[_a-zA-Z]' "<ident> doesn't start with a number
-        let base = line[col : start-1]
-        let start = col " reset start in case 1
+    let l:base = ''  " end of base word to filter completions
+    if l:col < l:start " may exist <IDENT>
+      if l:line[l:col] =~# '[_a-zA-Z]' "<ident> doesn't start with a number
+        let l:base = l:line[l:col : l:start-1]
+        let l:start = l:col " reset l:start in case 1
       else
         echo 'Can not complete after an invalid identifier <'
-            \. line[col : start-1] . '>'
-        return [-3, base]
+            \. l:line[l:col : l:start-1] . '>'
+        return [-3, l:base]
       endif
     endif
     
     " trim right spaces
-    while col > 0 && line[col -1] =~ '\s'
-      let col -= 1
+    while l:col > 0 && l:line[l:col -1] =~ '\s'
+      let l:col -= 1
     endwhile
    
-    let ismber = 0
-    if line[col - 1] == '.'
-        \ || (line[col - 1] == '>' && line[col - 2] == '-')
-        \ || (line[col - 1] == ':' && line[col - 2] == ':' && &filetype == 'cpp')
-      let start  = col
-      let ismber = 1
+    let l:ismber = 0
+    if l:line[l:col - 1] == '.'
+        \ || (l:line[l:col - 1] == '>' && l:line[l:col - 2] == '-')
+        \ || (l:line[l:col - 1] == ':' && l:line[l:col - 2] == ':' && &filetype == 'cpp')
+      let l:start  = l:col
+      let l:ismber = 1
     endif
     
     "Noting to complete, pattern completion is not supported...
-    if ! ismber && empty(base)
-      return [-3, base]
+    if ! l:ismber && empty(l:base)
+      return [-3, l:base]
     endif
-    return [start, base]
+    return [l:start, l:base]
 endf
 " }}}
 " {{{  s:ParseCompletionResult
@@ -555,35 +555,35 @@ endf
 " @base   Base word of completion
 " @return Parsed result list
 func! s:ParseCompletionResult(output, base)
-  let res = []
-  let has_preview = &completeopt =~# 'preview'
+  let l:res = []
+  let l:has_preview = &completeopt =~# 'preview'
   
-  for line in a:output
-    let s = stridx(line, ':', 13)
-    let word  = line[12 : s-2]
-    let proto = line[s+2 : -1]
+  for l:line in a:output
+    let l:s = stridx(l:line, ':', 13)
+    let l:word  = l:line[12 : l:s-2]
+    let l:proto = l:line[l:s+2 : -1]
     
-    if word !~# '^' . a:base || word =~# '(Hidden)$'
+    if l:word !~# '^' . a:base || l:word =~# '(Hidden)$'
       continue
     endif
     
-    let proto = substitute(proto, '\(<#\)\|\(#>\)\|#', '', 'g')
-    if empty(res) || res[-1]['word'] !=# word
-      call add(res, {
-          \ 'word': word,
-          \ 'menu': has_preview ? '' : proto,
-          \ 'info': proto,
+    let l:proto = substitute(l:proto, '\(<#\)\|\(#>\)\|#', '', 'g')
+    if empty(l:res) || l:res[-1]['word'] !=# l:word
+      call add(l:res, {
+          \ 'word': l:word,
+          \ 'menu': l:has_preview ? '' : l:proto,
+          \ 'info': l:proto,
           \ 'dup' : 1 })
-    elseif !empty(res) " overload functions, for C++
-      let res[-1]['info'] .= "\n" . proto
+    elseif !empty(l:res) " overload functions, for C++
+      let l:res[-1]['info'] .= "\n" . l:proto
     endif
   endfor
 
-  if has_preview && ! <SID>HasPreviewAbove()
+  if l:has_preview && ! <SID>HasPreviewAbove()
     pclose " close preview window before completion
   endif
   
-  return res
+  return l:res
 endf
 " }}}
 "{{{ ClangComplete
@@ -598,16 +598,16 @@ endf
 "
 func! ClangComplete(findstart, base)
   if a:findstart
-    let point = <SID>ParseCompletePoint()
-    let start = point[0]
-    let b:clang_baseword = point[1]
+    let l:point = <SID>ParseCompletePoint()
+    let l:start = l:point[0]
+    let b:clang_baseword = l:point[1]
 
     " buggy when update in the second phase ?
     silent update
 
-    let compat = start + 1
-    let lineat = line('.')
-    let line   = getline('.')
+    let l:compat = l:start + 1
+    let l:lineat = line('.')
+    let l:line   = getline('.')
     
     " Cache parsed result into b:clang_output
     " Reparse source file when:
@@ -619,49 +619,49 @@ func! ClangComplete(findstart, base)
     " completion point is same with old one.
     " Someting like md5sum to check source ?
     if !exists('b:clang_output')
-          \ || b:clang_compat_old !=  compat
-          \ || b:clang_lineat_old !=  lineat
-          \ || b:clang_line_old   !=# line[0 : compat-2]
+          \ || b:clang_compat_old !=  l:compat
+          \ || b:clang_lineat_old !=  l:lineat
+          \ || b:clang_line_old   !=# l:line[0 : l:compat-2]
           \ || b:clang_diags_haserr
-      let cwd = fnameescape(getcwd())
+      let l:cwd = fnameescape(getcwd())
       exe 'lcd ' . b:clang_root
-      let src = fnameescape(expand('%:p:.'))  " Thanks RageCooky, fix when a path has spaces.
-      let command = g:clang_exec.' -cc1 -fsyntax-only -code-completion-macros'
-            \ .' -code-completion-at='.src.':'.lineat.':'.compat
-            \ .' '.b:clang_options.' '.src
-      let b:clang_lineat_old = lineat
-      let b:clang_compat_old = compat
-      let b:clang_line_old   = line[0 : compat-2]
+      let l:src = fnameescape(expand('%:p:.'))  " Thanks RageCooky, fix when a path has spaces.
+      let l:command = g:clang_exec.' -cc1 -fsyntax-only -code-completion-macros'
+            \ .' -code-completion-at='.l:src.':'.l:lineat.':'.l:compat
+            \ .' '.b:clang_options.' '.l:src
+      let b:clang_lineat_old = l:lineat
+      let b:clang_compat_old = l:compat
+      let b:clang_line_old   = l:line[0 : l:compat-2]
       
       " Redir clang diagnostics into a tempfile.
       " * Fix stdout/stderr buffer flush bug? of clang, that COMPLETIONs are not
       "   flushed line by line when not output to a terminal.
       " * clang on Win32 will not redirect errors to stderr?
-      let tmp = tempname()
-      if has('win32') | let tmp='' | endif
-      if !empty(tmp)
-        let command .= ' 2>' . tmp
+      let l:tmp = tempname()
+      if has('win32') | let l:tmp='' | endif
+      if !empty(l:tmp)
+        let l:command .= ' 2>' . l:tmp
       endif
-      "echo command
-      let b:clang_output = split(system(command), "\n")
-      exe 'lcd ' . cwd
+      "echo l:command
+      let b:clang_output = split(system(l:command), "\n")
+      exe 'lcd ' . l:cwd
       
       "echo b:clang_output
-      let i = 0
-      if !empty(tmp)
+      let l:i = 0
+      if !empty(l:tmp)
         " FIXME Can't read file in Windows?
-        let b:clang_diags = readfile(tmp)
-        call delete(tmp)
+        let b:clang_diags = readfile(l:tmp)
+        call delete(l:tmp)
       else
         " Completions always comes after errors and warnings
         let b:clang_diags = []
-        for line in b:clang_output
-          if line =~# '^COMPLETION:' " parse completions
+        for l:line in b:clang_output
+          if l:line =~# '^COMPLETION:' " parse completions
             break
           else " Write info to split window
-            call add(b:clang_diags, line)
+            call add(b:clang_diags, l:line)
           endif
-          let i += 1
+          let l:i += 1
         endfor
       endif
       
@@ -672,11 +672,11 @@ func! ClangComplete(findstart, base)
         let b:clang_diags_haserr = 0
       endif
       
-      if i > 0
-        let b:clang_output = b:clang_output[i : -1]
+      if l:i > 0
+        let b:clang_output = b:clang_output[l:i : -1]
       endif
     endif
-    return start
+    return l:start
   else
     " Simulate CompleteDone event, see ClangCompleteInit().
     " b:clang_isCompleteDone_X is valid only when CompleteDone event is not available.
