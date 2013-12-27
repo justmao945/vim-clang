@@ -31,6 +31,10 @@
 "       Default: 'clang'
 "       Note: Use this if clang has a non-standard name, or isn't in the path.
 "  
+"  - g:clang_pwheight
+"       Maximum height of completion preview window if has it.
+"       Default: 4
+"
 "  - g:clang_diagsopt
 "       This option is a string combined with split mode, colon, and max height
 "       of split window. Colon and max height are optional.
@@ -121,6 +125,10 @@ endif
 
 if !exists('g:clang_exec')
   let g:clang_exec = 'clang'
+endif
+
+if !exists('g:clang_pwheight')
+  let g:clang_pwheight = 4
 endif
 
 if !exists('g:clang_diagsopt')
@@ -363,7 +371,7 @@ func! s:ParseCompletionResult(output, base)
 endf
 " }}}
 "{{{ s:ShowDiagnostics
-" Split a window to show clang diagnostics. If there's no diagnostic, close
+" Split a window to show clang diagnostics. If there's no diagnostics, close
 " the split window.
 "
 " @diags A list of lines from clang diagnostics, or a diagnostics file name.
@@ -446,7 +454,17 @@ func! s:ShowDiagnostics(diags, mode, maxheight)
 
   " back to current window
   exe bufwinnr(l:cbuf) . 'wincmd w'
-  
+endf
+"}}}
+"{{{  s:ShowDiagnosticsAndClear
+" This function will do clear diagnostics after calling ShowDiagnostics.
+" This is required because if I do quit the diagnostics window, what I 
+" want is to ignore this errors, so we should clear all diagnostics
+func! s:ShowDiagnosticsAndClear(diags, mode, maxheight)
+  call <SID>ShowDiagnostics(a:diags, a:mode, a:maxheight)
+  if ! empty(a:diags)
+    call remove(a:diags, 0, -1)
+  endif
 endf
 "}}}
 "{{{ s:ShrinkPrevieWindow
@@ -463,7 +481,7 @@ func! s:ShrinkPrevieWindow()
 
   wincmd k " go to above view
   if( &previewwindow )
-    exe 'resize ' . (line('$') - 1)
+    exe 'resize ' . min([(line('$') - 1), g:clang_pwheight])
     if l:cft !=# &filetype
       exe 'set filetype=' . l:cft
       setl nobuflisted
@@ -484,11 +502,11 @@ endf
 "   4. setup buffer maps to auto completion
 "  
 "  Usable vars after return:
-"     b:clang_diags
-"     b:clang_isCompleteDone_0
-"     b:clang_options
-"     b:clang_options_noPCH
-"     b:clang_root
+"     b:clang_diags => diagnostics created by clang
+"     b:clang_isCompleteDone_0  => used when CompleteDone event not available
+"     b:clang_options => parepared clang cmd options
+"     b:clang_options_noPCH  => same as b:clang_options except no pch options
+"     b:clang_root => project root to run clang
 func! s:ClangCompleteInit()
   let l:cwd = fnameescape(getcwd())
   let l:fwd = fnameescape(expand('%:p:h'))
@@ -578,14 +596,14 @@ func! s:ClangCompleteInit()
     if exists("##CompleteDone")
       " Automatically show clang diagnostics after completion.
       au CompleteDone <buffer> 
-            \ call <SID>ShowDiagnostics(b:clang_diags, s:cd_mode, s:cd_height)
+            \ call <SID>ShowDiagnosticsAndClear(b:clang_diags, s:cd_mode, s:cd_height)
     else
       " FIXME I don't know why VIM escapes after press a key when the
       " completion pattern not found...
       let b:clang_isCompleteDone_1 = 0
       au CursorMovedI <buffer>
             \ if b:clang_isCompleteDone_1 |
-            \   call <SID>ShowDiagnostics(b:clang_diags, s:cd_mode, s:cd_height) |
+            \   call <SID>ShowDiagnosticsAndClear(b:clang_diags, s:cd_mode, s:cd_height) |
             \   let b:clang_isCompleteDone_1 = 0 |
             \ endif
     endif
@@ -605,8 +623,7 @@ endf
 func! ClangComplete(findstart, base)
   if a:findstart
     let l:point = <SID>ParseCompletePoint()
-    let l:start = l:point[0]
-    let b:clang_baseword = l:point[1]
+    let [l:start, b:clang_baseword] = l:point
 
     " buggy when update in the second phase ?
     silent update
