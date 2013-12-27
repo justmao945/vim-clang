@@ -30,7 +30,13 @@
 "       Name or path of executable clang.
 "       Default: 'clang'
 "       Note: Use this if clang has a non-standard name, or isn't in the path.
-"  
+"   
+"  - g:clang_vim_exec
+"       Name or path of executable vim.
+"       Default: 'vim'
+"       Note: This is option is used in async mode to startup a new vim
+"       process. Please add vim to your system PATH or overwrite this var.
+"
 "  - g:clang_pwheight
 "       Maximum height of completion preview window if has it.
 "       Default: 4
@@ -125,6 +131,10 @@ endif
 
 if !exists('g:clang_exec')
   let g:clang_exec = 'clang'
+endif
+
+if !exists('g:clang_vim_exec')
+  let g:clang_vim_exec = 'vim'
 endif
 
 if !exists('g:clang_pwheight')
@@ -222,36 +232,6 @@ func! s:DiscoverIncludeDirs(clang, options)
     endif
   endfor
   return l:res
-endf
-"}}}
-"{{{ s:ExecuteClang
-" Execute clang binary to generate completions and diagnostics.
-"
-" @root Clang root, project directory
-" @clang_exe Executable clang binary image
-" @clang_options Options appended to clang binary image
-" @line Line to complete
-" @col Column to complete
-" @return [completion, diagnostics]
-func! s:ExecuteClang(root, clang_exe, clang_options, line, col)
-  let l:cwd = fnameescape(getcwd())
-  exe 'lcd ' . a:root
-  let l:src = fnameescape(expand('%:p:.'))  " Thanks RageCooky, fix when a path has spaces.
-  let l:command = a:clang_exe.' -cc1 -fsyntax-only -code-completion-macros'
-        \ .' -code-completion-at='.l:src.':'.a:line.':'.a:col
-        \ .' '.a:clang_options.' '.l:src
-
-  " Redir clang diagnostics into a tempfile.
-  " * Fix stdout/stderr buffer flush bug? of clang, that COMPLETIONs are not
-  "   flushed line by line when not output to a terminal.
-  " * FIXME: clang on Win32 will not redirect errors to stderr?
-  let l:tmp = tempname()
-  let l:command .= ' 2>' . l:tmp
-  let l:clang_output = split(system(l:command), "\n")
-  exe 'lcd ' . l:cwd
-  let l:clang_diags = readfile(l:tmp)
-  call delete(l:tmp)
-  return [l:clang_output, l:clang_diags]
 endf
 "}}}
 "{{{  s:GenPCH
@@ -400,6 +380,23 @@ func! s:ParseCompletionResult(output, base)
   return l:res
 endf
 " }}}
+" {{{ s:DeleteAfterReadTmps
+" @tmps Tmp files name list
+" @return a list of read files
+func! s:DeleteAfterReadTmps(tmps)
+  if type(a:tmps) != type([])
+    echo "Invalid arg ". a:tmps
+  endif
+  let l:res = []
+  let l:i = 0
+  while l:i < len(a:tmps)
+    call add(l:res, readfile(a:tmps[ l:i ]))
+    call delete(a:tmps[ l:i ])
+    let l:i = l:i + 1
+  endwhile
+  return l:res
+endf
+"}}}
 "{{{ s:ShowDiagnostics
 " Split a window to show clang diagnostics. If there's no diagnostics, close
 " the split window.
@@ -577,7 +574,7 @@ func! s:ClangCompleteInit()
   " Create GenPCH command
   com! -nargs=* ClangGenPCHFromFile
         \ call <SID>GenPCH(g:clang_exec, b:clang_options_noPCH, <f-args>)
-
+  
   " try to find PCH files in clang_root and clang_root/include
   " Or add `-include-pch /path/to/x.h.pch` into the root file .clang manully
   if &filetype ==# 'cpp' && b:clang_options !~# '-include-pch'
@@ -640,9 +637,72 @@ func! s:ClangCompleteInit()
   endif
 endf
 "}}}
+"{{{ s:ExecuteClang
+" Execute clang binary to generate completions and diagnostics.
+"     Buffer vars (only valid in async mode):
+"       b:clang_isBusy   => flag to record clang_exe status
+"       b:clang_stdout    => stdout, raw completion info
+"       b:clang_stderr    => stderr, diagnostics info
+" @root Clang root, project directory
+" @clang_exe Executable clang binary image
+" @clang_options Options appended to clang binary image
+" @line Line to complete
+" @col Column to complete
+" @return [completion, diagnostics]
+func! s:ExecuteClang(root, clang_exe, clang_options, line, col)
+  let l:cwd = fnameescape(getcwd())
+  exe 'lcd ' . a:root
+  let l:src = fnameescape(expand('%:p:.'))  " Thanks RageCooky, fix when a path has spaces.
+  let l:command = a:clang_exe.' -cc1 -fsyntax-only -code-completion-macros'
+        \ .' -code-completion-at='.l:src.':'.a:line.':'.a:col
+        \ .' '.a:clang_options.' '.l:src
+
+  " Redir clang diagnostics into a tempfile.
+  " * Fix stdout/stderr buffer flush bug? of clang, that COMPLETIONs are not
+  "   flushed line by line when not output to a terminal.
+  " * FIXME: clang on Win32 will not redirect errors to stderr?
+  let l:tmps = [tempname(), tempname()] " FIXME: potential bug for tempname
+  let l:command .= ' 1>'.l:tmps[0].' 2>'.l:tmps[1]
+  let l:res = [[], []]
+  if !exists('v:servername')
+    call system(l:command)
+    let l:res = <SID>DeleteAfterReadTmps(l:tmps)
+  elseif !exists('b:clang_isBusy') || ! b:clang_isBusy
+    let l:vcmd = g:clang_vim_exec.' -s --noplugin --servername '.v:servername
+              \  .' --remote-send "<ESC>:call ExecuteClangDone(\"'
+              \  .l:tmps[0].'\", \"'.l:tmps[1].'\")<ENTER>"'
+    let l:command = '('.l:command.';'.l:vcmd.') &'
+    if !exists('b:clang_stdout')
+      let b:clang_stdout = []
+    endif
+    if !exists('b:clang_stderr')
+      let b:clang_stderr = []
+    endif
+    let l:res = [b:clang_stdout, b:clang_stderr] " they will be updated in ExecuteClangDone
+    let b:clang_isBusy = 1
+    call system(l:command)
+  else
+  endif
+  exe 'lcd ' . l:cwd
+  return l:res
+endf
+"}}}
+" {{{ ExecuteClangDone
+"     Buffer vars:
+"       b:clang_isBusy
+"       b:clang_stdout
+"       b:clang_stderr
+func! ExecuteClangDone(tmp1, tmp2)
+  let [b:clang_stdout, b:clang_stderr] = <SID>DeleteAfterReadTmps([a:tmp1, a:tmp2])
+  let b:clang_isBusy = 0
+  call feedkeys(g:clang_auto_cmd) " here will call ClangComplete again
+endf
+" }}}
 "{{{ ClangComplete
 " Complete main routine, valid cases are showed as below.
 " Buffer varialbe:
+"       b:clang_isBusy => used in async mode
+"
 "       b:clang_cache => {
 "         'completions': [],   // parsed completion list
 "         'diagnostics': [],   // raw diagnostics info list
@@ -665,6 +725,9 @@ endf
 "
 func! ClangComplete(findstart, base)
   if a:findstart
+    if exists('b:clang_isBusy') && b:clang_isBusy
+      return -3
+    endif
     let [l:start, l:base] = <SID>ParseCompletePoint()
     " buggy when update in the second phase ?
     silent update
@@ -702,7 +765,6 @@ func! ClangComplete(findstart, base)
     return b:clang_cache['completions']
   endif
 endf
-
 "}}}
 
 " vim: set shiftwidth=2 softtabstop=2 tabstop=2:
