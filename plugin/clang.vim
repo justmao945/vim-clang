@@ -224,6 +224,36 @@ func! s:DiscoverIncludeDirs(clang, options)
   return l:res
 endf
 "}}}
+"{{{ s:ExecuteClang
+" Execute clang binary to generate completions and diagnostics.
+"
+" @root Clang root, project directory
+" @clang_exe Executable clang binary image
+" @clang_options Options appended to clang binary image
+" @line Line to complete
+" @col Column to complete
+" @return [completion, diagnostics]
+func! s:ExecuteClang(root, clang_exe, clang_options, line, col)
+  let l:cwd = fnameescape(getcwd())
+  exe 'lcd ' . a:root
+  let l:src = fnameescape(expand('%:p:.'))  " Thanks RageCooky, fix when a path has spaces.
+  let l:command = a:clang_exe.' -cc1 -fsyntax-only -code-completion-macros'
+        \ .' -code-completion-at='.l:src.':'.a:line.':'.a:col
+        \ .' '.a:clang_options.' '.l:src
+
+  " Redir clang diagnostics into a tempfile.
+  " * Fix stdout/stderr buffer flush bug? of clang, that COMPLETIONs are not
+  "   flushed line by line when not output to a terminal.
+  " * FIXME: clang on Win32 will not redirect errors to stderr?
+  let l:tmp = tempname()
+  let l:command .= ' 2>' . l:tmp
+  let l:clang_output = split(system(l:command), "\n")
+  exe 'lcd ' . l:cwd
+  let l:clang_diags = readfile(l:tmp)
+  call delete(l:tmp)
+  return [l:clang_output, l:clang_diags]
+endf
+"}}}
 "{{{  s:GenPCH
 " Generate clang precompiled header.
 " A new file with postfix '.pch' will be created if success.
@@ -503,7 +533,7 @@ endf
 "  
 "  Usable vars after return:
 "     b:clang_diags => diagnostics created by clang
-"     b:clang_isCompleteDone_0  => used when CompleteDone event not available
+"     b:clang_isCompleteDone_0/1  => used when CompleteDone event not available
 "     b:clang_options => parepared clang cmd options
 "     b:clang_options_noPCH  => same as b:clang_options except no pch options
 "     b:clang_root => project root to run clang
@@ -612,6 +642,19 @@ endf
 "}}}
 "{{{ ClangComplete
 " Complete main routine, valid cases are showed as below.
+" Buffer varialbe:
+"       b:clang_cache => {
+"         'completions': [],   // parsed completion list
+"         'diagnostics': [],   // raw diagnostics info list
+"         'line'    : 0,  // previous completion line number
+"         'col'     : 0,  // previous completion column number
+"         'getline' : ''  // previous completion line content
+"       }
+"
+"       b:clang_diags =>  
+"           A deep copy of b:clang_cache['diagnostics'] used to be shown in
+"           diagnostics' window.
+"
 " Note: 1. This will not parse previous lines, which means that only care
 "       current line.
 "       2. Clang diagnostics will be saved to b:clang_diags after completion.
@@ -622,15 +665,13 @@ endf
 "
 func! ClangComplete(findstart, base)
   if a:findstart
-    let l:point = <SID>ParseCompletePoint()
-    let [l:start, b:clang_baseword] = l:point
-
+    let [l:start, l:base] = <SID>ParseCompletePoint()
     " buggy when update in the second phase ?
     silent update
-
-    let l:compat = l:start + 1
-    let l:lineat = line('.')
-    let l:line   = getline('.')
+    
+    let l:line    = line('.')
+    let l:col     = l:start + 1
+    let l:getline = getline('.')[0 : l:col-2]
     
     " Cache parsed result into b:clang_output
     " Reparse source file when:
@@ -641,63 +682,16 @@ func! ClangComplete(findstart, base)
     " FIXME Update of cache may be delayed when the context is changed but the
     " completion point is same with old one.
     " Someting like md5sum to check source ?
-    if !exists('b:clang_output')
-          \ || b:clang_compat_old !=  l:compat
-          \ || b:clang_lineat_old !=  l:lineat
-          \ || b:clang_line_old   !=# l:line[0 : l:compat-2]
-          \ || b:clang_diags_haserr
-      let l:cwd = fnameescape(getcwd())
-      exe 'lcd ' . b:clang_root
-      let l:src = fnameescape(expand('%:p:.'))  " Thanks RageCooky, fix when a path has spaces.
-      let l:command = g:clang_exec.' -cc1 -fsyntax-only -code-completion-macros'
-            \ .' -code-completion-at='.l:src.':'.l:lineat.':'.l:compat
-            \ .' '.b:clang_options.' '.l:src
-      let b:clang_lineat_old = l:lineat
-      let b:clang_compat_old = l:compat
-      let b:clang_line_old   = l:line[0 : l:compat-2]
-      
-      " Redir clang diagnostics into a tempfile.
-      " * Fix stdout/stderr buffer flush bug? of clang, that COMPLETIONs are not
-      "   flushed line by line when not output to a terminal.
-      " * clang on Win32 will not redirect errors to stderr?
-      let l:tmp = tempname()
-      if has('win32') | let l:tmp='' | endif
-      if !empty(l:tmp)
-        let l:command .= ' 2>' . l:tmp
-      endif
-      "echo l:command
-      let b:clang_output = split(system(l:command), "\n")
-      exe 'lcd ' . l:cwd
-      
-      "echo b:clang_output
-      let l:i = 0
-      if !empty(l:tmp)
-        " FIXME Can't read file in Windows?
-        let b:clang_diags = readfile(l:tmp)
-        call delete(l:tmp)
-      else
-        " Completions always comes after errors and warnings
-        let b:clang_diags = []
-        for l:line in b:clang_output
-          if l:line =~# '^COMPLETION:' " parse completions
-            break
-          else " Write info to split window
-            call add(b:clang_diags, l:line)
-          endif
-          let l:i += 1
-        endfor
-      endif
-      
-      " The last item in b:clang_diags has statistics info of diagnostics
-      if !empty(b:clang_diags) && b:clang_diags[-1] =~ 'error\|warning'
-        let b:clang_diags_haserr = 1
-      else
-        let b:clang_diags_haserr = 0
-      endif
-      
-      if l:i > 0
-        let b:clang_output = b:clang_output[l:i : -1]
-      endif
+    if !exists('b:clang_cache')
+          \ || b:clang_cache['col']     !=  l:col
+          \ || b:clang_cache['line']    !=  l:line
+          \ || b:clang_cache['getline'] !=# l:getline
+          \ || ! empty(b:clang_cache['diagnostics'])
+      let b:clang_cache = { 'col': l:col, 'line': l:line, 'getline': l:getline }
+      let [l:output, b:clang_diags] = 
+          \ <SID>ExecuteClang(b:clang_root, g:clang_exec, b:clang_options, l:line, l:col)
+      let b:clang_cache['completions'] = <SID>ParseCompletionResult(l:output, l:base)
+      let b:clang_cache['diagnostics'] = deepcopy(b:clang_diags)
     endif
     return l:start
   else
@@ -705,7 +699,7 @@ func! ClangComplete(findstart, base)
     " b:clang_isCompleteDone_X is valid only when CompleteDone event is not available.
     let b:clang_isCompleteDone_0 = 1
     let b:clang_isCompleteDone_1 = 1
-    return <SID>ParseCompletionResult(b:clang_output, b:clang_baseword)
+    return b:clang_cache['completions']
   endif
 endf
 
