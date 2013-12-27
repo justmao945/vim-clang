@@ -134,6 +134,45 @@ endif
 " Init on c/c++ files
 au FileType c,cpp call <SID>ClangCompleteInit()
 "}}}
+" {{{ s:Complete[Dot|Arrow|Colon]
+" Tigger a:cmd when cursor is after . -> and ::
+
+func! s:ShouldComplete()
+  if getline('.') =~ '#\s*\(include\|import\)' || getline('.')[col('.') - 2] == "'"
+    return 0
+  endif
+  if col('.') == 1
+    return 1
+  endif
+  for id in synstack(line('.'), col('.') - 1)
+    if synIDattr(id, 'name') =~ 'Comment\|String\|Number\|Char\|Label\|Special'
+      return 0
+    endif
+  endfor
+  return 1
+endf
+
+func! s:CompleteDot(cmd)
+  if s:ShouldComplete()
+    return '.' . a:cmd
+  endif
+  return '.'
+endf
+
+func! s:CompleteArrow(cmd)
+  if s:ShouldComplete() && getline('.')[col('.') - 2] == '-'
+    return '>' . a:cmd
+  endif
+  return '>'
+endf
+
+func! s:CompleteColon(cmd)
+  if s:ShouldComplete() && getline('.')[col('.') - 2] == ':'
+    return ':' . a:cmd
+  endif
+  return ':'
+endf
+"}}}
 "{{{ s:DiscoverIncludeDirs
 " Discover clang default include directories.
 " Output of `echo | clang -c -v -x c++ -`:
@@ -211,32 +250,6 @@ func! s:GenPCH(clang, options, header)
   return l:clang_output
 endf
 "}}}
-"{{{ s:ShrinkPrevieWindow
-" Shrink preview window to fit lines.
-" Assume cursor is in the editing window, and preview window is above of it.
-func! s:ShrinkPrevieWindow()
-  if &completeopt !~# 'preview'
-    return
-  endif
-
-  "current view
-  let l:cbuf = bufnr('%')
-  let l:cft  = &filetype
-
-  wincmd k " go to above view
-  if( &previewwindow )
-    exe 'resize ' . (line('$') - 1)
-    if l:cft !=# &filetype
-      exe 'set filetype=' . l:cft
-      setl nobuflisted
-      setl statusline=Prototypes
-    endif
-  endif
-
-  " back to current window
-  exe bufwinnr(l:cbuf) . 'wincmd w'
-endf
-"}}}
 " {{{ s:HasPreviewAbove
 " 
 " Detect above view is preview window or not.
@@ -252,45 +265,103 @@ func! s:HasPreviewAbove()
   return l:has
 endf
 "}}}
-" {{{ s:Complete[Dot|Arrow|Colon]
-" Tigger a:cmd when cursor is after . -> and ::
-
-func! s:ShouldComplete()
-  if getline('.') =~ '#\s*\(include\|import\)' || getline('.')[col('.') - 2] == "'"
-    return 0
-  endif
-  if col('.') == 1
-    return 1
-  endif
-  for id in synstack(line('.'), col('.') - 1)
-    if synIDattr(id, 'name') =~ 'Comment\|String\|Number\|Char\|Label\|Special'
-      return 0
+" {{{ s:ParseCompletePoint
+" <IDENT> indicates an identifier
+" </> the completion point
+" <.> including a `.` or `->` or `::`
+" <s> zero or more spaces and tabs
+" <*> is anything other then the new line `\n`
+"
+" 1  <*><IDENT><s></>         complete identfiers start with <IDENT>
+" 2  <*><.><s></>             complete all members
+" 3  <*><.><s><IDENT><s></>   complete identifers start with <IDENT>
+" @return [start, base] start is used by omni and base is used to filter
+" completion result
+func! s:ParseCompletePoint()
+    let l:line = getline('.')
+    let l:start = col('.') - 1 " start column
+    
+    "trim right spaces
+    while l:start > 0 && l:line[l:start - 1] =~ '\s'
+      let l:start -= 1
+    endwhile
+    
+    let l:col = l:start
+    while l:col > 0 && l:line[l:col - 1] =~# '[_0-9a-zA-Z]'  " find valid ident
+      let l:col -= 1
+    endwhile
+    
+    let l:base = ''  " end of base word to filter completions
+    if l:col < l:start " may exist <IDENT>
+      if l:line[l:col] =~# '[_a-zA-Z]' "<ident> doesn't start with a number
+        let l:base = l:line[l:col : l:start-1]
+        let l:start = l:col " reset l:start in case 1
+      else
+        echo 'Can not complete after an invalid identifier <'
+            \. l:line[l:col : l:start-1] . '>'
+        return [-3, l:base]
+      endif
+    endif
+    
+    " trim right spaces
+    while l:col > 0 && l:line[l:col -1] =~ '\s'
+      let l:col -= 1
+    endwhile
+   
+    let l:ismber = 0
+    if l:line[l:col - 1] == '.'
+        \ || (l:line[l:col - 1] == '>' && l:line[l:col - 2] == '-')
+        \ || (l:line[l:col - 1] == ':' && l:line[l:col - 2] == ':' && &filetype == 'cpp')
+      let l:start  = l:col
+      let l:ismber = 1
+    endif
+    
+    "Noting to complete, pattern completion is not supported...
+    if ! l:ismber && empty(l:base)
+      return [-3, l:base]
+    endif
+    return [l:start, l:base]
+endf
+" }}}
+" {{{  s:ParseCompletionResult
+" Completion output of clang:
+"   COMPLETION: <ident> : <prototype>
+"   0           12     c  c+3
+" @output Raw clang completion output
+" @base   Base word of completion
+" @return Parsed result list
+func! s:ParseCompletionResult(output, base)
+  let l:res = []
+  let l:has_preview = &completeopt =~# 'preview'
+  
+  for l:line in a:output
+    let l:s = stridx(l:line, ':', 13)
+    let l:word  = l:line[12 : l:s-2]
+    let l:proto = l:line[l:s+2 : -1]
+    
+    if l:word !~# '^' . a:base || l:word =~# '(Hidden)$'
+      continue
+    endif
+    
+    let l:proto = substitute(l:proto, '\(<#\)\|\(#>\)\|#', '', 'g')
+    if empty(l:res) || l:res[-1]['word'] !=# l:word
+      call add(l:res, {
+          \ 'word': l:word,
+          \ 'menu': l:has_preview ? '' : l:proto,
+          \ 'info': l:proto,
+          \ 'dup' : 1 })
+    elseif !empty(l:res) " overload functions, for C++
+      let l:res[-1]['info'] .= "\n" . l:proto
     endif
   endfor
-  return 1
-endf
 
-func! s:CompleteDot(cmd)
-  if s:ShouldComplete()
-    return '.' . a:cmd
+  if l:has_preview && ! <SID>HasPreviewAbove()
+    pclose " close preview window before completion
   endif
-  return '.'
+  
+  return l:res
 endf
-
-func! s:CompleteArrow(cmd)
-  if s:ShouldComplete() && getline('.')[col('.') - 2] == '-'
-    return '>' . a:cmd
-  endif
-  return '>'
-endf
-
-func! s:CompleteColon(cmd)
-  if s:ShouldComplete() && getline('.')[col('.') - 2] == ':'
-    return ':' . a:cmd
-  endif
-  return ':'
-endf
-"}}}
+" }}}
 "{{{ s:ShowDiagnostics
 " Split a window to show clang diagnostics. If there's no diagnostic, close
 " the split window.
@@ -378,6 +449,32 @@ func! s:ShowDiagnostics(diags, mode, maxheight)
   
 endf
 "}}}
+"{{{ s:ShrinkPrevieWindow
+" Shrink preview window to fit lines.
+" Assume cursor is in the editing window, and preview window is above of it.
+func! s:ShrinkPrevieWindow()
+  if &completeopt !~# 'preview'
+    return
+  endif
+
+  "current view
+  let l:cbuf = bufnr('%')
+  let l:cft  = &filetype
+
+  wincmd k " go to above view
+  if( &previewwindow )
+    exe 'resize ' . (line('$') - 1)
+    if l:cft !=# &filetype
+      exe 'set filetype=' . l:cft
+      setl nobuflisted
+      setl statusline=Prototypes
+    endif
+  endif
+
+  " back to current window
+  exe bufwinnr(l:cbuf) . 'wincmd w'
+endf
+"}}}
 "{{{ s:ClangCompleteInit
 " Initialization for every C/C++ source buffer:
 "   1. find set root to file .clang
@@ -385,7 +482,13 @@ endf
 "   3. append user options first
 "   3.5 append clang default include directories to option
 "   4. setup buffer maps to auto completion
-"
+"  
+"  Usable vars after return:
+"     b:clang_diags
+"     b:clang_isCompleteDone_0
+"     b:clang_options
+"     b:clang_options_noPCH
+"     b:clang_root
 func! s:ClangCompleteInit()
   let l:cwd = fnameescape(getcwd())
   let l:fwd = fnameescape(expand('%:p:h'))
@@ -489,103 +592,6 @@ func! s:ClangCompleteInit()
   endif
 endf
 "}}}
-" {{{ s:ParseCompletePoint
-" <IDENT> indicates an identifier
-" </> the completion point
-" <.> including a `.` or `->` or `::`
-" <s> zero or more spaces and tabs
-" <*> is anything other then the new line `\n`
-"
-" 1  <*><IDENT><s></>         complete identfiers start with <IDENT>
-" 2  <*><.><s></>             complete all members
-" 3  <*><.><s><IDENT><s></>   complete identifers start with <IDENT>
-" @return [start, base] start is used by omni and base is used to filter
-" completion result
-func! s:ParseCompletePoint()
-    let l:line = getline('.')
-    let l:start = col('.') - 1 " start column
-    
-    "trim right spaces
-    while l:start > 0 && l:line[l:start - 1] =~ '\s'
-      let l:start -= 1
-    endwhile
-    
-    let l:col = l:start
-    while l:col > 0 && l:line[l:col - 1] =~# '[_0-9a-zA-Z]'  " find valid ident
-      let l:col -= 1
-    endwhile
-    
-    let l:base = ''  " end of base word to filter completions
-    if l:col < l:start " may exist <IDENT>
-      if l:line[l:col] =~# '[_a-zA-Z]' "<ident> doesn't start with a number
-        let l:base = l:line[l:col : l:start-1]
-        let l:start = l:col " reset l:start in case 1
-      else
-        echo 'Can not complete after an invalid identifier <'
-            \. l:line[l:col : l:start-1] . '>'
-        return [-3, l:base]
-      endif
-    endif
-    
-    " trim right spaces
-    while l:col > 0 && l:line[l:col -1] =~ '\s'
-      let l:col -= 1
-    endwhile
-   
-    let l:ismber = 0
-    if l:line[l:col - 1] == '.'
-        \ || (l:line[l:col - 1] == '>' && l:line[l:col - 2] == '-')
-        \ || (l:line[l:col - 1] == ':' && l:line[l:col - 2] == ':' && &filetype == 'cpp')
-      let l:start  = l:col
-      let l:ismber = 1
-    endif
-    
-    "Noting to complete, pattern completion is not supported...
-    if ! l:ismber && empty(l:base)
-      return [-3, l:base]
-    endif
-    return [l:start, l:base]
-endf
-" }}}
-" {{{  s:ParseCompletionResult
-" Completion output of clang:
-"   COMPLETION: <ident> : <prototype>
-"   0           12     c  c+3
-" @output Raw clang completion output
-" @base   Base word of completion
-" @return Parsed result list
-func! s:ParseCompletionResult(output, base)
-  let l:res = []
-  let l:has_preview = &completeopt =~# 'preview'
-  
-  for l:line in a:output
-    let l:s = stridx(l:line, ':', 13)
-    let l:word  = l:line[12 : l:s-2]
-    let l:proto = l:line[l:s+2 : -1]
-    
-    if l:word !~# '^' . a:base || l:word =~# '(Hidden)$'
-      continue
-    endif
-    
-    let l:proto = substitute(l:proto, '\(<#\)\|\(#>\)\|#', '', 'g')
-    if empty(l:res) || l:res[-1]['word'] !=# l:word
-      call add(l:res, {
-          \ 'word': l:word,
-          \ 'menu': l:has_preview ? '' : l:proto,
-          \ 'info': l:proto,
-          \ 'dup' : 1 })
-    elseif !empty(l:res) " overload functions, for C++
-      let l:res[-1]['info'] .= "\n" . l:proto
-    endif
-  endfor
-
-  if l:has_preview && ! <SID>HasPreviewAbove()
-    pclose " close preview window before completion
-  endif
-  
-  return l:res
-endf
-" }}}
 "{{{ ClangComplete
 " Complete main routine, valid cases are showed as below.
 " Note: 1. This will not parse previous lines, which means that only care
