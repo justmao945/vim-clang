@@ -113,10 +113,6 @@ if !exists('g:clang_auto')
   let g:clang_auto = 1
 endif
 
-if !exists('g:clang_auto_cmd')
-  let g:clang_auto_cmd = "\<C-X>\<C-O>"
-endif
-
 if !exists('g:clang_c_options')
   let g:clang_c_options = ''
 endif
@@ -170,23 +166,23 @@ func! s:ShouldComplete()
   return 1
 endf
 
-func! s:CompleteDot(cmd)
+func! s:CompleteDot()
   if s:ShouldComplete()
-    return '.' . a:cmd
+    return ".\<C-x>\<C-o>"
   endif
   return '.'
 endf
 
-func! s:CompleteArrow(cmd)
+func! s:CompleteArrow()
   if s:ShouldComplete() && getline('.')[col('.') - 2] == '-'
-    return '>' . a:cmd
+    return ">\<C-x>\<C-o>"
   endif
   return '>'
 endf
 
-func! s:CompleteColon(cmd)
+func! s:CompleteColon()
   if s:ShouldComplete() && getline('.')[col('.') - 2] == ':'
-    return ':' . a:cmd
+    return ":\<C-x>\<C-o>"
   endif
   return ':'
 endf
@@ -590,10 +586,10 @@ func! s:ClangCompleteInit()
   setl omnifunc=ClangComplete
 
   if g:clang_auto   " Auto completion
-    inoremap <expr> <buffer> . <SID>CompleteDot(g:clang_auto_cmd)
-    inoremap <expr> <buffer> > <SID>CompleteArrow(g:clang_auto_cmd)
+    inoremap <expr> <buffer> . <SID>CompleteDot()
+    inoremap <expr> <buffer> > <SID>CompleteArrow()
     if &filetype == 'cpp'
-      inoremap <expr> <buffer> : <SID>CompleteColon(g:clang_auto_cmd)
+      inoremap <expr> <buffer> : <SID>CompleteColon()
     endif
   endif
 
@@ -665,8 +661,10 @@ func! s:ExecuteClang(root, clang_exe, clang_options, line, col, vim_exe)
     call system(l:command)
     let l:res = s:DeleteAfterReadTmps(l:tmps)
   else
-    let l:vcmd = printf('%s -s --noplugin --servername %s --remote-send "<ESC>:call ExecuteClangDone(\"%s\",\"%s\")<ENTER><ESC>:<ESC>"',
-                    \   a:vim_exe, v:servername, l:tmps[0], l:tmps[1])
+    let l:keys = printf('<Esc>:call ExecuteClangDone(\"%s\",\"%s\")<Enter><Esc>a<C-x><C-o>',
+                    \  l:tmps[0], l:tmps[1])
+    let l:vcmd = printf('%s -s --noplugin --servername %s --remote-send "%s"',
+                    \   a:vim_exe, v:servername, l:keys)
     let l:command = '('.l:command.';'.l:vcmd.') &'
     call system(l:command)
   endif
@@ -682,7 +680,6 @@ func! ExecuteClangDone(tmp1, tmp2)
   let b:clang_state['state'] = 'sync'
   let b:clang_state['stdout'] = l:res[0]
   let b:clang_state['stderr'] = l:res[1]
-  "call feedkeys("\<ESC>\<Add>".g:clang_auto_cmd, 'n') " here will call ClangComplete again
 endf
 " }}}
 "{{{ ClangComplete
@@ -725,7 +722,7 @@ func! ClangComplete(findstart, base)
       let b:clang_state = { 'state': 'ready', 'stdout': [], 'stderr': [] }
     endif
     if b:clang_state['state'] == 'busy'
-      echo 'still working...'
+      " echo 'still working...'
       return -3
     endif
     
@@ -765,7 +762,7 @@ func! ClangComplete(findstart, base)
     endif
     
     if  b:clang_state['state'] == 'busy'  " async mode
-      echo "start working..."
+      " echo "start working..."
       let b:clang_cache['completions'] = []  " clean legancy data
       let b:clang_cache['diagnostics'] = []
       return -3
