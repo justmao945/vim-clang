@@ -635,12 +635,12 @@ endf
 "}}}
 "{{{ s:ExecuteClang
 " Execute clang binary to generate completions and diagnostics.
-"     Buffer vars:
-"         b:clang_state => {
-"           'state' :  // updated to 'ready' in sync mode
-"           'stdout':  // updated in sync mode
-"           'stderr':  // updated in sync mode
-"         }
+" Buffer vars:
+"     b:clang_state => {
+"       'state' :  // updated to 'ready' in sync mode
+"       'stdout':  // updated in sync mode
+"       'stderr':  // updated in sync mode
+"     }
 " @root Clang root, project directory
 " @clang_exe Executable clang binary image
 " @clang_options Options appended to clang binary image
@@ -665,29 +665,25 @@ func! s:ExecuteClang(root, clang_exe, clang_options, line, col, vim_exe)
     let b:clang_state['state'] = 'ready'
     call system(l:command)
     let l:res = s:DeleteAfterReadTmps(l:tmps)
-    let b:clang_state['stdout'] = l:res[0]
-    let b:clang_state['stderr'] = l:res[1]
   else
-    let l:keys = printf('<Esc>:call ExecuteClangDone(\"%s\",\"%s\")<Enter><Esc>a<C-x><C-o>',
-                    \  l:tmps[0], l:tmps[1])
-    let l:vcmd = printf('%s -s --noplugin --servername %s --remote-send "%s"',
-                    \   a:vim_exe, v:servername, l:keys)
+    let l:keys = printf('<Esc>:call ExecuteClangDone(\"%s\",\"%s\")<Enter><Esc>a<C-x><C-o>', l:tmps[0], l:tmps[1])
+    let l:vcmd = printf('%s -s --noplugin --servername %s --remote-send "%s"', a:vim_exe, v:servername, l:keys)
     let l:command = '('.l:command.';'.l:vcmd.') &'
     call system(l:command)
-    let b:clang_state['stdout'] = []
-    let b:clang_state['stderr'] = []
   endif
   exe 'lcd ' . l:cwd
+  let b:clang_state['stdout'] = l:res[0]
+  let b:clang_state['stderr'] = l:res[1]
   return l:res
 endf
 "}}}
 " {{{ ExecuteClangDone
-"     Buffer vars:
-"         b:clang_state => {
-"           'state' :  // updated to 'sync' in async mode
-"           'stdout':  // updated in async mode
-"           'stderr':  // updated in async mode
-"         }
+" Buffer vars:
+"     b:clang_state => {
+"       'state' :  // updated to 'sync' in async mode
+"       'stdout':  // updated in async mode
+"       'stderr':  // updated in async mode
+"     }
 func! ExecuteClangDone(tmp1, tmp2)
   let l:res = s:DeleteAfterReadTmps([a:tmp1, a:tmp2])
   let b:clang_state['state'] = 'sync'
@@ -696,53 +692,37 @@ func! ExecuteClangDone(tmp1, tmp2)
 endf
 " }}}
 "{{{ ClangComplete
-" Complete main routine, valid cases are showed as below.
+" More about @findstart and @base to check :h omnifunc
 " Async mode states:
 "     ready -> busy -> sync -> ready
 " Sync mode states:
 "     ready -> busy -> ready
-"
 " Buffer varialbe:
-"       b:clang_state => {
-"         'state' : 'ready' | 'busy' | 'sync',
-"         'stdout': [],
-"         'stderr': [],
-"         'base':   '',  // only used in ClangComplete function to share base word
-"       }
-
-"       b:clang_cache => {
-"         'line'    : 0,  // previous completion line number
-"         'col'     : 0,  // previous completion column number
-"         'getline' : ''  // previous completion line content
-"         'diags'   : ''  // number of diagnostics
-"       }
-"
-"       b:clang_diags =>
-"           A deep copy of b:clang_cache['diagnostics'] used to be shown in
-"           diagnostics' window.
-"
-" Note: 1. This will not parse previous lines, which means that only care
-"       current line.
-"       2. Clang diagnostics will be saved to b:clang_diags after completion.
-" More about @findstart and @base to check :h omnifunc
-"
-" FIXME Tabs can't work corrently at ... =~ '\s' ?
-" `set expandtab` is recommended
-"
+"    b:clang_state => {
+"      'state' : 'ready' | 'busy' | 'sync',
+"      'stdout': [],
+"      'stderr': [],
+"    }
+"    b:clang_cache => {
+"      'line'    : 0,  // previous completion line number
+"      'col'     : 0,  // previous completion column number
+"      'getline' : ''  // previous completion line content
+"      'completions': [] // parsed completion result
+"      'diagnostics': [] // diagnostics info
+"    }
+"    b:clang_diags =>
+"        A deep copy of b:clang_cache['diagnostics'] used to be shown in
+"        diagnostics' window.
 func! ClangComplete(findstart, base)
   if a:findstart
     if !exists('b:clang_state')
       let b:clang_state = { 'state': 'ready', 'stdout': [], 'stderr': [] }
     endif
-    if b:clang_state['state'] == 'busy'
-      " echo 'still working...'
+    if b:clang_state['state'] == 'busy'  " re-enter async mode, clang is busy
       return -3
     endif
     
     let [l:start, l:base] = s:ParseCompletePoint()
-    " buggy when update in the second phase ?
-    silent update
-    
     let l:line    = line('.')
     let l:col     = l:start + 1
     let l:getline = getline('.')[0 : l:col-2]
@@ -761,38 +741,32 @@ func! ClangComplete(findstart, base)
           \ || b:clang_cache['col']     !=  l:col
           \ || b:clang_cache['line']    !=  l:line
           \ || b:clang_cache['getline'] !=# l:getline
-          \ || b:clang_cache['diags'] > 0
-      let b:clang_cache = { 'col': l:col, 'line': l:line, 'getline': l:getline, 'diags': 0 }
+          \ || ! empty(b:clang_cache['diagnostics'])
+      let b:clang_cache = {'col': l:col, 'line': l:line, 'getline': l:getline}
       " update state machine
       if b:clang_state['state'] == 'ready'
         let b:clang_state['state'] = 'busy'
+        silent update " buggy when update in the second phase ?
         call s:ExecuteClang(b:clang_root, g:clang_exec, b:clang_options, l:line, l:col, g:clang_vim_exec)
       elseif b:clang_state['state'] == 'sync'
         let b:clang_state['state'] = 'ready'
       endif
       " update diagnostics info
-      let b:clang_diags = deepcopy(b:clang_state['stderr'])
-      let b:clang_cache['diags'] = len(b:clang_diags)
+      let b:clang_cache['diagnostics'] = b:clang_state['stderr']
+      let b:clang_diags = deepcopy(b:clang_cache['diagnostics'])
     endif
-    
-    if  b:clang_state['state'] == 'busy'  " async mode
-      " echo 'start working...'
-      let b:clang_cache['completions'] = []  " clean legancy data
-      let b:clang_cache['diagnostics'] = []
+    if  b:clang_state['state'] == 'busy'  " start async mode, need to wait the call back
       return -3
     endif
-    
-    " shared in phase 2
-    let b:clang_state['base'] = l:base
+    " update completions by new l:base
+    let b:clang_cache['completions'] = s:ParseCompletionResult(b:clang_state['stdout'], l:base)
     return l:start
   else
     " Simulate CompleteDone event, see ClangCompleteInit().
     " b:clang_isCompleteDone_X is valid only when CompleteDone event is not available.
     let b:clang_isCompleteDone_0 = 1
     let b:clang_isCompleteDone_1 = 1
-    
-    " reparse result, because base may be changed during caching
-    return s:ParseCompletionResult(b:clang_state['stdout'], b:clang_state['base'])
+    return b:clang_cache['completions']
   endif
 endf
 "}}}
