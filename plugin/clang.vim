@@ -211,7 +211,7 @@ endf
 " @options Additional options passed to clang, e.g. -stdlib=libc++
 " @return List of dirs: ['path1', 'path2', ...]
 func! s:DiscoverIncludeDirs(clang, options)
-  let l:command = 'echo | ' . a:clang . ' -fsyntax-only -v ' . a:options . ' -'
+  let l:command = printf('echo | %s -fsyntax-only -v %s -', a:clang, a:options)
   let l:clang_output = split(system(l:command), "\n")
   
   let l:i = 0
@@ -254,8 +254,7 @@ func! s:GenPCH(clang, options, header)
     if cho != 1 | return | endif
   endif
   
-  let l:command = a:clang . ' -cc1 ' . a:options .
-        \ ' -emit-pch -o ' . l:header.'.pch ' . l:header
+  let l:command = printf('%s -cc1 %s -emit-pch -o %s.pch %s', a:clang, a:options, l:header, l:header)
   let l:clang_output = system(l:command)
 
   if v:shell_error
@@ -373,7 +372,7 @@ func! s:ParseCompletionResult(output, base)
     endif
   endfor
 
-  if l:has_preview && ! <SID>HasPreviewAbove()
+  if l:has_preview && ! s:HasPreviewAbove()
     pclose " close preview window before completion
   endif
   
@@ -488,7 +487,7 @@ endf
 " This is required because if I do quit the diagnostics window, what I 
 " want is to ignore this errors, so we should clear all diagnostics
 func! s:ShowDiagnosticsAndClear(diags, mode, maxheight)
-  call <SID>ShowDiagnostics(a:diags, a:mode, a:maxheight)
+  call s:ShowDiagnostics(a:diags, a:mode, a:maxheight)
   if ! empty(a:diags)
     call remove(a:diags, 0, -1)
   endif
@@ -639,24 +638,21 @@ endf
 "}}}
 "{{{ s:ExecuteClang
 " Execute clang binary to generate completions and diagnostics.
-"     Buffer vars (only valid in async mode):
-"       b:clang_isBusy   => flag to record clang_exe status
-"       b:clang_stdout    => stdout, raw completion info
-"       b:clang_stderr    => stderr, diagnostics info
+"     Buffer vars:
+"         b:clang_state
 " @root Clang root, project directory
 " @clang_exe Executable clang binary image
 " @clang_options Options appended to clang binary image
 " @line Line to complete
 " @col Column to complete
+" @vim_exe Executable vim binary image, used in async mode
 " @return [completion, diagnostics]
-func! s:ExecuteClang(root, clang_exe, clang_options, line, col)
+func! s:ExecuteClang(root, clang_exe, clang_options, line, col, vim_exe)
   let l:cwd = fnameescape(getcwd())
   exe 'lcd ' . a:root
   let l:src = fnameescape(expand('%:p:.'))  " Thanks RageCooky, fix when a path has spaces.
-  let l:command = a:clang_exe.' -cc1 -fsyntax-only -code-completion-macros'
-        \ .' -code-completion-at='.l:src.':'.a:line.':'.a:col
-        \ .' '.a:clang_options.' '.l:src
-
+  let l:command = printf('%s -cc1 -fsyntax-only -code-completion-macros -code-completion-at=%s:%d:%d %s %s',
+                      \ a:clang_exe, l:src, a:line, a:col, a:clang_options, l:src)
   " Redir clang diagnostics into a tempfile.
   " * Fix stdout/stderr buffer flush bug? of clang, that COMPLETIONs are not
   "   flushed line by line when not output to a terminal.
@@ -665,23 +661,14 @@ func! s:ExecuteClang(root, clang_exe, clang_options, line, col)
   let l:command .= ' 1>'.l:tmps[0].' 2>'.l:tmps[1]
   let l:res = [[], []]
   if !exists('v:servername')
+    let b:clang_state['state'] = 'ready'
     call system(l:command)
-    let l:res = <SID>DeleteAfterReadTmps(l:tmps)
-  elseif !exists('b:clang_isBusy') || ! b:clang_isBusy
-    let l:vcmd = g:clang_vim_exec.' -s --noplugin --servername '.v:servername
-              \  .' --remote-send "<ESC>:call ExecuteClangDone(\"'
-              \  .l:tmps[0].'\", \"'.l:tmps[1].'\")<ENTER>"'
-    let l:command = '('.l:command.';'.l:vcmd.') &'
-    if !exists('b:clang_stdout')
-      let b:clang_stdout = []
-    endif
-    if !exists('b:clang_stderr')
-      let b:clang_stderr = []
-    endif
-    let l:res = [b:clang_stdout, b:clang_stderr] " they will be updated in ExecuteClangDone
-    let b:clang_isBusy = 1
-    call system(l:command)
+    let l:res = s:DeleteAfterReadTmps(l:tmps)
   else
+    let l:vcmd = printf('%s -s --noplugin --servername %s --remote-send "<ESC>:call ExecuteClangDone(\"%s\",\"%s\")<ENTER><ESC>:<ESC>"',
+                    \   a:vim_exe, v:servername, l:tmps[0], l:tmps[1])
+    let l:command = '('.l:command.';'.l:vcmd.') &'
+    call system(l:command)
   endif
   exe 'lcd ' . l:cwd
   return l:res
@@ -689,20 +676,29 @@ endf
 "}}}
 " {{{ ExecuteClangDone
 "     Buffer vars:
-"       b:clang_isBusy
-"       b:clang_stdout
-"       b:clang_stderr
+"         b:clang_state
 func! ExecuteClangDone(tmp1, tmp2)
-  let [b:clang_stdout, b:clang_stderr] = <SID>DeleteAfterReadTmps([a:tmp1, a:tmp2])
-  let b:clang_isBusy = 0
-  call feedkeys(g:clang_auto_cmd) " here will call ClangComplete again
+  let l:res = s:DeleteAfterReadTmps([a:tmp1, a:tmp2])
+  let b:clang_state['state'] = 'sync'
+  let b:clang_state['stdout'] = l:res[0]
+  let b:clang_state['stderr'] = l:res[1]
+  "call feedkeys("\<ESC>\<Add>".g:clang_auto_cmd, 'n') " here will call ClangComplete again
 endf
 " }}}
 "{{{ ClangComplete
 " Complete main routine, valid cases are showed as below.
-" Buffer varialbe:
-"       b:clang_isBusy => used in async mode
+" Async mode states:
+"     ready -> busy -> sync -> ready
+" Sync mode states:
+"     ready -> busy -> ready
 "
+" Buffer varialbe:
+"       b:clang_state => {
+"         'state' : 'ready' | 'busy' | 'sync',
+"         'stdout': [],
+"         'stderr': [],
+"       }
+
 "       b:clang_cache => {
 "         'completions': [],   // parsed completion list
 "         'diagnostics': [],   // raw diagnostics info list
@@ -711,7 +707,7 @@ endf
 "         'getline' : ''  // previous completion line content
 "       }
 "
-"       b:clang_diags =>  
+"       b:clang_diags =>
 "           A deep copy of b:clang_cache['diagnostics'] used to be shown in
 "           diagnostics' window.
 "
@@ -725,10 +721,15 @@ endf
 "
 func! ClangComplete(findstart, base)
   if a:findstart
-    if exists('b:clang_isBusy') && b:clang_isBusy
+    if !exists('b:clang_state')
+      let b:clang_state = { 'state': 'ready', 'stdout': [], 'stderr': [] }
+    endif
+    if b:clang_state['state'] == 'busy'
+      echo 'still working...'
       return -3
     endif
-    let [l:start, l:base] = <SID>ParseCompletePoint()
+    
+    let [l:start, l:base] = s:ParseCompletePoint()
     " buggy when update in the second phase ?
     silent update
     
@@ -736,7 +737,7 @@ func! ClangComplete(findstart, base)
     let l:col     = l:start + 1
     let l:getline = getline('.')[0 : l:col-2]
     
-    " Cache parsed result into b:clang_output
+    " Cache parsed result into b:clang_cache
     " Reparse source file when:
     "   * first time
     "   * completion point changed
@@ -745,16 +746,27 @@ func! ClangComplete(findstart, base)
     " FIXME Update of cache may be delayed when the context is changed but the
     " completion point is same with old one.
     " Someting like md5sum to check source ?
-    if !exists('b:clang_cache')
+    if !exists('b:clang_cache') || b:clang_state['state'] == 'sync'
           \ || b:clang_cache['col']     !=  l:col
           \ || b:clang_cache['line']    !=  l:line
           \ || b:clang_cache['getline'] !=# l:getline
-          \ || ! empty(b:clang_cache['diagnostics'])
+          \ || ! empty(b:clang_cache['diagnostics']) 
       let b:clang_cache = { 'col': l:col, 'line': l:line, 'getline': l:getline }
-      let [l:output, b:clang_diags] = 
-          \ <SID>ExecuteClang(b:clang_root, g:clang_exec, b:clang_options, l:line, l:col)
-      let b:clang_cache['completions'] = <SID>ParseCompletionResult(l:output, l:base)
+      if b:clang_state['state'] == 'ready'
+        let b:clang_state['state'] = 'busy'
+        let [l:output, b:clang_diags] =
+            \ s:ExecuteClang(b:clang_root, g:clang_exec, b:clang_options, l:line, l:col, g:clang_vim_exec)
+      elseif b:clang_state['state'] == 'sync'
+        let b:clang_state['state'] = 'ready'
+        let [l:output, b:clang_diags] = [b:clang_state['stdout'], b:clang_state['stderr']]
+      endif
+      let b:clang_cache['completions'] = s:ParseCompletionResult(l:output, l:base)
       let b:clang_cache['diagnostics'] = deepcopy(b:clang_diags)
+    endif
+    
+    if  b:clang_state['state'] == 'busy'  " async mode
+      echo "start working..."
+      return -3
     endif
     return l:start
   else
