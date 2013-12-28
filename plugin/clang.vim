@@ -750,7 +750,7 @@ func! ClangComplete(findstart, base)
           \ || b:clang_cache['col']     !=  l:col
           \ || b:clang_cache['line']    !=  l:line
           \ || b:clang_cache['getline'] !=# l:getline
-          \ || ! empty(b:clang_cache['diagnostics']) 
+          \ || ! empty(b:clang_cache['diagnostics'])
       let b:clang_cache = { 'col': l:col, 'line': l:line, 'getline': l:getline }
       if b:clang_state['state'] == 'ready'
         let b:clang_state['state'] = 'busy'
@@ -766,6 +766,8 @@ func! ClangComplete(findstart, base)
     
     if  b:clang_state['state'] == 'busy'  " async mode
       echo "start working..."
+      let b:clang_cache['completions'] = []  " clean legancy data
+      let b:clang_cache['diagnostics'] = []
       return -3
     endif
     return l:start
