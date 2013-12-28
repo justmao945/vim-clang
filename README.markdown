@@ -46,9 +46,20 @@ If you use clang_complete with libclang and open many C/C++ source files, you'll
 5. Better PCH support. vim-clang will find stdafx.h.pch automatically.
 
 
+Asynchronized mode [new]
+--------------------
+* Now vim-clang supports to call clang executable asynchronously that it won't block
+vim during the completion. This is very useful if your project is large and the machine
+is not very powerful to parse them in tens of milliseconds. In synchronized mode you'll
+find that's too 'slow' to wait the completion...
+
+* This mode is implemented by starting another vim process to notify the finish of the
+   completion, so `+clientserver` option is required to compile the vim(generally added).
+
 Installation
 -------------
-Put the file `plugin/clang.vim` into `~/.vim/plugin`.
+* Put the file `plugin/clang.vim` into `~/.vim/plugin` is OK.
+* [pathogen.vim][4] `cd ~/.vim/bundle; git clone https://github.com/justmao945/vim-clang.git` is recommended.
 
 
 Options and Commands
@@ -56,14 +67,9 @@ Options and Commands
 See file `plugin/clang.vim`
 
 
-Windows support
+OS requirement
 --------------------
-I don't know if some people would like to use VIM + Clang comppletion on Micorsot Windows,
-as many good IDE(e.g. Visual Studio, VC++ express etc.) provide better experience.
-Another reason is that Windows is not the first class platform supported by Clang.
-But as the [ishani][2] provides standalone and prebuild Clang binary files,
-which helps a lot on vim-clang support for Windows. Now you can [download][3] the latest prebuild
-Clang for Windows from [here][3].
+Now only tested on Linux (Ubuntu/Debian)
 
 
 Screenshots
@@ -96,10 +102,8 @@ Screenshots
 ![.clang C source done](http://justmao945.github.io/static/vim-clang/2013-02-06-143716_593x635_scrot_zps260a9d03.png)
 
 
-#### vim-clang on Microsoft Windows
-![.clang](http://justmao945.github.io/static/vim-clang/65E068079898_zps573dcaae.png)
-
-
 [1]: https://github.com/Rip-Rip/clang_complete
 [2]: http://www.ishani.org
 [3]: http://www.ishani.org/web/articles/code/clang-win32/
+[4]: https://github.com/tpope/vim-pathogen
+
