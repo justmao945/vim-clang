@@ -254,11 +254,11 @@ func! s:GenPCH(clang, options, header)
   let l:clang_output = system(l:command)
 
   if v:shell_error
-    echo 'Clang returns error ' . v:shell_error
-    echo l:command
-    echo l:clang_output
+    echoe 'Clang returns error ' . v:shell_error
+    echoe l:command
+    echoe l:clang_output
   else
-    echo 'Clang creates PCH flie ' . l:header . '.pch successfully!'
+    echoe 'Clang creates PCH flie ' . l:header . '.pch successfully!'
   endif
   return l:clang_output
 endf
@@ -310,7 +310,7 @@ func! s:ParseCompletePoint()
         let l:base = l:line[l:col : l:start-1]
         let l:start = l:col " reset l:start in case 1
       else
-        echo 'Can not complete after an invalid identifier <'
+        echoe 'Can not complete after an invalid identifier <'
             \. l:line[l:col : l:start-1] . '>'
         return [-3, l:base]
       endif
@@ -333,6 +333,7 @@ func! s:ParseCompletePoint()
     if ! l:ismber && empty(l:base)
       return [-3, l:base]
     endif
+    " echom printf("start: %s, base: %s", l:start, l:base)
     return [l:start, l:base]
 endf
 " }}}
@@ -380,7 +381,7 @@ endf
 " @return a list of read files
 func! s:DeleteAfterReadTmps(tmps)
   if type(a:tmps) != type([])
-    echo "Invalid arg ". a:tmps
+    echoe "Invalid arg ". a:tmps
   endif
   let l:res = []
   let l:i = 0
@@ -410,7 +411,7 @@ func! s:ShowDiagnostics(diags, mode, maxheight)
   if type(l:diags) == type('') " diagnostics file name
     let l:diags = readfile(l:diags)
   elseif type(l:diags) != type([])
-    echo 'Invalid arg ' . l:diags
+    echoe 'Invalid arg ' . l:diags
     return
   endif
   
@@ -635,7 +636,11 @@ endf
 "{{{ s:ExecuteClang
 " Execute clang binary to generate completions and diagnostics.
 "     Buffer vars:
-"         b:clang_state
+"         b:clang_state => {
+"           'state' :  // updated to 'ready' in sync mode
+"           'stdout':  // updated in sync mode
+"           'stderr':  // updated in sync mode
+"         }
 " @root Clang root, project directory
 " @clang_exe Executable clang binary image
 " @clang_options Options appended to clang binary image
@@ -660,6 +665,8 @@ func! s:ExecuteClang(root, clang_exe, clang_options, line, col, vim_exe)
     let b:clang_state['state'] = 'ready'
     call system(l:command)
     let l:res = s:DeleteAfterReadTmps(l:tmps)
+    let b:clang_state['stdout'] = l:res[0]
+    let b:clang_state['stderr'] = l:res[1]
   else
     let l:keys = printf('<Esc>:call ExecuteClangDone(\"%s\",\"%s\")<Enter><Esc>a<C-x><C-o>',
                     \  l:tmps[0], l:tmps[1])
@@ -667,6 +674,8 @@ func! s:ExecuteClang(root, clang_exe, clang_options, line, col, vim_exe)
                     \   a:vim_exe, v:servername, l:keys)
     let l:command = '('.l:command.';'.l:vcmd.') &'
     call system(l:command)
+    let b:clang_state['stdout'] = []
+    let b:clang_state['stderr'] = []
   endif
   exe 'lcd ' . l:cwd
   return l:res
@@ -674,7 +683,11 @@ endf
 "}}}
 " {{{ ExecuteClangDone
 "     Buffer vars:
-"         b:clang_state
+"         b:clang_state => {
+"           'state' :  // updated to 'sync' in async mode
+"           'stdout':  // updated in async mode
+"           'stderr':  // updated in async mode
+"         }
 func! ExecuteClangDone(tmp1, tmp2)
   let l:res = s:DeleteAfterReadTmps([a:tmp1, a:tmp2])
   let b:clang_state['state'] = 'sync'
@@ -694,14 +707,14 @@ endf
 "         'state' : 'ready' | 'busy' | 'sync',
 "         'stdout': [],
 "         'stderr': [],
+"         'base':   '',  // only used in ClangComplete function to share base word
 "       }
 
 "       b:clang_cache => {
-"         'completions': [],   // parsed completion list
-"         'diagnostics': [],   // raw diagnostics info list
 "         'line'    : 0,  // previous completion line number
 "         'col'     : 0,  // previous completion column number
 "         'getline' : ''  // previous completion line content
+"         'diags'   : ''  // number of diagnostics
 "       }
 "
 "       b:clang_diags =>
@@ -733,6 +746,7 @@ func! ClangComplete(findstart, base)
     let l:line    = line('.')
     let l:col     = l:start + 1
     let l:getline = getline('.')[0 : l:col-2]
+    " echom printf("line: %s, col: %s, getline: %s", l:line, l:col, l:getline)
     
     " Cache parsed result into b:clang_cache
     " Reparse source file when:
@@ -747,33 +761,38 @@ func! ClangComplete(findstart, base)
           \ || b:clang_cache['col']     !=  l:col
           \ || b:clang_cache['line']    !=  l:line
           \ || b:clang_cache['getline'] !=# l:getline
-          \ || ! empty(b:clang_cache['diagnostics'])
-      let b:clang_cache = { 'col': l:col, 'line': l:line, 'getline': l:getline }
+          \ || b:clang_cache['diags'] > 0
+      let b:clang_cache = { 'col': l:col, 'line': l:line, 'getline': l:getline, 'diags': 0 }
+      " update state machine
       if b:clang_state['state'] == 'ready'
         let b:clang_state['state'] = 'busy'
-        let [l:output, b:clang_diags] =
-            \ s:ExecuteClang(b:clang_root, g:clang_exec, b:clang_options, l:line, l:col, g:clang_vim_exec)
+        call s:ExecuteClang(b:clang_root, g:clang_exec, b:clang_options, l:line, l:col, g:clang_vim_exec)
       elseif b:clang_state['state'] == 'sync'
         let b:clang_state['state'] = 'ready'
-        let [l:output, b:clang_diags] = [b:clang_state['stdout'], b:clang_state['stderr']]
       endif
-      let b:clang_cache['completions'] = s:ParseCompletionResult(l:output, l:base)
-      let b:clang_cache['diagnostics'] = deepcopy(b:clang_diags)
+      " update diagnostics info
+      let b:clang_diags = deepcopy(b:clang_state['stderr'])
+      let b:clang_cache['diags'] = len(b:clang_diags)
     endif
     
     if  b:clang_state['state'] == 'busy'  " async mode
-      " echo "start working..."
+      " echo 'start working...'
       let b:clang_cache['completions'] = []  " clean legancy data
       let b:clang_cache['diagnostics'] = []
       return -3
     endif
+    
+    " shared in phase 2
+    let b:clang_state['base'] = l:base
     return l:start
   else
     " Simulate CompleteDone event, see ClangCompleteInit().
     " b:clang_isCompleteDone_X is valid only when CompleteDone event is not available.
     let b:clang_isCompleteDone_0 = 1
     let b:clang_isCompleteDone_1 = 1
-    return b:clang_cache['completions']
+    
+    " reparse result, because base may be changed during caching
+    return s:ParseCompletionResult(b:clang_state['stdout'], b:clang_state['base'])
   endif
 endf
 "}}}
