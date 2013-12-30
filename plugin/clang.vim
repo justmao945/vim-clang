@@ -433,9 +433,11 @@ func! s:ShowDiagnostics(diags, mode, maxheight)
       return
     endif
   else " goto diag window
-    exe l:diags_winnr . 'wincmd w'
-    if empty(l:diags) " hide the diag window and !!RETURN!!
+    if empty(l:diags) " hide the diag window then restore cursor and !!RETURN!!
+      exe l:diags_winnr . 'wincmd w'
       hide
+      " back to current window
+      exe bufwinnr(l:cbuf) . 'wincmd w'
       return
     endif
   endif
