@@ -753,8 +753,9 @@ func! ExecuteClangDone(tmp1, tmp2)
   let b:clang_state['state'] = 'sync'
   let b:clang_state['stdout'] = l:res[0]
   let b:clang_state['stderr'] = l:res[1]
+  call feedkeys("\<Esc>a")
   if ! empty(l:res[0])
-    call feedkeys("\<Esc>a\<C-x>\<C-o>")
+    call feedkeys("\<C-x>\<C-o>")
   else
     " As the default action of <C-x><C-o> causes a 'pattern not found'
     " when the result is empty, which break our input, that's really painful...
@@ -763,7 +764,6 @@ func! ExecuteClangDone(tmp1, tmp2)
       call s:ShowDiagnosticsAndClear(b:clang_diags,
       \   s:clang_diags_mode, s:clang_diags_height, g:clang_statusline)
     endif
-    call feedkeys("\<Esc>a")
   endif
 endf
 " }}}
@@ -832,10 +832,11 @@ func! ClangComplete(findstart, base)
         let b:clang_state['state'] = 'ready'
       endif
       " update diagnostics info
+      let b:clang_cache['completions'] = [] " empty completions
       let b:clang_cache['diagnostics'] = b:clang_state['stderr']
       let b:clang_diags = deepcopy(b:clang_cache['diagnostics'])
     endif
-    if  b:clang_state['state'] == 'busy'  " start async mode, need to wait the call back
+    if b:clang_state['state'] == 'busy'  " start async mode, need to wait the call back
       return -3
     endif
     " update completions by new l:base
@@ -846,7 +847,10 @@ func! ClangComplete(findstart, base)
     " b:clang_isCompleteDone_X is valid only when CompleteDone event is not available.
     let b:clang_isCompleteDone_0 = 1
     let b:clang_isCompleteDone_1 = 1
-    return b:clang_cache['completions']
+    if exists('b:clang_cache')
+      return b:clang_cache['completions']
+    else
+      return []
   endif
 endf
 "}}}
