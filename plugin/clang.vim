@@ -756,6 +756,7 @@ func! ClangExecuteDone(tmp1, tmp2)
   let b:clang_state['state'] = 'sync'
   let b:clang_state['stdout'] = l:res[0]
   let b:clang_state['stderr'] = l:res[1]
+  call feedkeys("\<Esc>a")
   if ! empty(l:res[0])
     call feedkeys("\<C-x>\<C-o>")
   else
