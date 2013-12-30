@@ -36,6 +36,8 @@
 "       Default: 'vim'
 "       Note: This is option is used in async mode to startup a new vim
 "       process. Please add vim to your system PATH or overwrite this var.
+"       Please note that default the command 'vim' will not act as a server,
+"       instead you must add '--servername XX' to start a unique server.
 "
 "  - g:clang_pwheight
 "       Maximum height of completion preview window if has it.
@@ -711,7 +713,7 @@ func! s:ExecuteClang(root, clang_exe, clang_options, line, col, vim_exe)
   let l:tmps = [tempname(), tempname()] " FIXME: potential bug for tempname
   let l:command .= ' 1>'.l:tmps[0].' 2>'.l:tmps[1]
   let l:res = [[], []]
-  if !exists('v:servername')
+  if !exists('v:servername') || empty(v:servername)
     let b:clang_state['state'] = 'ready'
     call system(l:command)
     let l:res = s:DeleteAfterReadTmps(l:tmps)
