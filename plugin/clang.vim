@@ -64,6 +64,12 @@
 "             in Vim's terminology, referring to the various subpanels or 
 "             splits within Vim) should be split.
 "
+"  - g:clang_statusline
+"       Status line showed in preview window and diagnostics window.
+"       The first %s is the place to hold messages generated from clang.
+"       Default: '%s\ \|\ %%l/\%%L\ \|\ %%p%%%%'
+"                Something like   "1 error generated. | 1/5 | 20%"
+"
 "  - g:clang_stdafx_h
 "       Clang default header file name to generate PCH. Clang will find the
 "       stdafx header to speed up completion.
@@ -150,6 +156,10 @@ endif
 
 if !exists('g:clang_diagsopt')
   let g:clang_diagsopt = 'b:rightbelow:6'
+endif
+
+if !exists('g:clang_statusline')
+  let g:clang_statusline='%s\ \|\ %%l/\%%L\ \|\ %%p%%%%'
 endif
 
 if !exists('g:clang_stdafx_h')
@@ -415,8 +425,9 @@ endf
 "       'b:rightbelow':split VIEWPORT horizontally, with new split on the bottom
 "       'b:leftabove' :split VIEWPORT horizontally, with new split on the top
 " @maxheight Maximum window height.
+" @statusline Status line format
 " @return -1 or window number
-func! s:ShowDiagnostics(diags, mode, maxheight)
+func! s:ShowDiagnostics(diags, mode, maxheight, statusline)
   let l:diags = a:diags
   if type(l:diags) == type('') " diagnostics file name
     let l:diags = readfile(l:diags)
@@ -485,7 +496,7 @@ func! s:ShowDiagnostics(diags, mode, maxheight)
   hi ClangSynDiagsPosition        guifg=Green   ctermfg=10
 
   " change file name to the last line of diags and goto line 1
-  exe 'setl statusline=' . escape(l:diags[-1], ' \')
+  exe printf('setl statusline='.a:statusline, escape(l:diags[-1], ' \'))
 
   " back to current window
   exe bufwinnr(l:cbuf) . 'wincmd w'
@@ -499,8 +510,8 @@ endf
 "
 " Buffer varialbe
 "   b:clang_diags_winnr   <= save
-func! s:ShowDiagnosticsAndClear(diags, mode, maxheight)
-  let b:clang_diags_winnr = s:ShowDiagnostics(a:diags, a:mode, a:maxheight)
+func! s:ShowDiagnosticsAndClear(diags, mode, maxheight, statusline)
+  let b:clang_diags_winnr = s:ShowDiagnostics(a:diags, a:mode, a:maxheight, a:statusline)
   if ! empty(a:diags)
     call remove(a:diags, 0, -1)
   endif
@@ -524,7 +535,8 @@ endf
 "{{{ s:ShrinkPrevieWindow
 " Shrink preview window to fit lines.
 " Assume cursor is in the editing window, and preview window is above of it.
-func! s:ShrinkPrevieWindow()
+" @statusline Status line format
+func! s:ShrinkPrevieWindow(statusline)
   if &completeopt !~# 'preview'
     return
   endif
@@ -539,7 +551,7 @@ func! s:ShrinkPrevieWindow()
     if l:cft !=# &filetype
       exe 'set filetype=' . l:cft
       setl nobuflisted
-      setl statusline=Prototypes
+      exe printf('setl statusline='.a:statusline, 'Prototypes')
     endif
   endif
 
@@ -634,12 +646,12 @@ func! s:ClangCompleteInit()
   if exists("##CompleteDone")
     " Automatically resize preview window after completion.
     " Default assume preview window is above of the editing window.
-    au CompleteDone <buffer> call <SID>ShrinkPrevieWindow()
+    au CompleteDone <buffer> call <SID>ShrinkPrevieWindow(g:clang_statusline)
   else
     let b:clang_isCompleteDone_0 = 0
     au CursorMovedI <buffer>
           \ if b:clang_isCompleteDone_0 |
-          \   call <SID>ShrinkPrevieWindow() |
+          \   call <SID>ShrinkPrevieWindow(g:clang_statusline) |
           \   let b:clang_isCompleteDone_0 = 0 |
           \ endif
   endif
@@ -655,14 +667,16 @@ func! s:ClangCompleteInit()
     if exists("##CompleteDone")
       " Automatically show clang diagnostics after completion.
       au CompleteDone <buffer> 
-            \ call <SID>ShowDiagnosticsAndClear(b:clang_diags, s:clang_diags_mode, s:clang_diags_height)
+            \ call <SID>ShowDiagnosticsAndClear(b:clang_diags,
+            \ s:clang_diags_mode, s:clang_diags_height, g:clang_statusline)
     else
       " FIXME I don't know why VIM escapes after press a key when the
       " completion pattern not found...
       let b:clang_isCompleteDone_1 = 0
       au CursorMovedI <buffer>
             \ if b:clang_isCompleteDone_1 |
-            \   call <SID>ShowDiagnosticsAndClear(b:clang_diags, s:clang_diags_mode, s:clang_diags_height) |
+            \   call <SID>ShowDiagnosticsAndClear(b:clang_diags,
+                \   s:clang_diags_mode, s:clang_diags_height, g:clang_statusline) |
             \   let b:clang_isCompleteDone_1 = 0 |
             \ endif
     endif
@@ -725,6 +739,9 @@ endf
 " Script vars:
 "   s:clang_diags_mode
 "   s:clang_diags_height
+"
+" FIXME: global var:
+"   g:clang_statusline
 func! ExecuteClangDone(tmp1, tmp2)
   let l:res = s:DeleteAfterReadTmps([a:tmp1, a:tmp2])
   let b:clang_state['state'] = 'sync'
@@ -737,7 +754,8 @@ func! ExecuteClangDone(tmp1, tmp2)
     " when the result is empty, which break our input, that's really painful...
     call ClangComplete(0, ClangComplete(1, 0))
     if exists('b:clang_diags') && exists('s:clang_diags_mode') && exists('s:clang_diags_height')
-      call s:ShowDiagnosticsAndClear(b:clang_diags, s:clang_diags_mode, s:clang_diags_height)
+      call s:ShowDiagnosticsAndClear(b:clang_diags,
+      \   s:clang_diags_mode, s:clang_diags_height, g:clang_statusline)
     endif
     call feedkeys("\<Esc>a")
   endif
