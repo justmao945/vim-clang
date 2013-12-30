@@ -370,11 +370,15 @@ endf
 func! s:ParseCompletionResult(output, base)
   let l:res = []
   let l:has_preview = &completeopt =~# 'preview'
-  
   for l:line in a:output
     let l:s = stridx(l:line, ':', 13)
-    let l:word  = l:line[12 : l:s-2]
-    let l:proto = l:line[l:s+2 : -1]
+    if l:s == -1
+      let l:word  = l:line[12:-1]
+      let l:proto = l:word
+    else
+      let l:word  = l:line[12 : l:s-2]
+      let l:proto = l:line[l:s+2 : -1]
+    endif
     
     if l:word !~# '^' . a:base || l:word =~# '(Hidden)$'
       continue
