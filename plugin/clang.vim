@@ -78,10 +78,17 @@
 "       Generate PCH file from the give file name <stdafx.h>, which can be %
 "       (aka current file name).
 "
+"  - ClangClosePreviewDiagWindow
+"       Close preview and diagnostics window for current buffer.
+"       Or uses a leader map to do this this
+"         map <silent> <Leader>c <Esc>:ClangClosePreviewDiagWindow<CR>
 " Notes:
-"   1. Make sure clang is available in path when g:clang_exec is empty
+"   1. Make sure `clang` is available in path when g:clang_exec is empty
 "
-"   2. Set completeopt+=preview to show prototype in preview window.
+"   2. Make sure `vim` is available in path if uses asynchronized mode(default)
+"     if g:clang_vim_exec is empty.
+"
+"   3. Set completeopt+=preview to show prototype in preview window.
 "      But there's no local completeopt, so we use BufEnter event.
 "      e.g. only for C++ sources but not for C, add
 "         au BufEnter *.cc,*.cpp,*.hh,*hpp set completeopt+=preview
@@ -404,7 +411,7 @@ endf
 "       'b:rightbelow':split VIEWPORT horizontally, with new split on the bottom
 "       'b:leftabove' :split VIEWPORT horizontally, with new split on the top
 " @maxheight Maximum window height.
-" @return
+" @return -1 or window number
 func! s:ShowDiagnostics(diags, mode, maxheight)
   let l:diags = a:diags
 
@@ -412,7 +419,7 @@ func! s:ShowDiagnostics(diags, mode, maxheight)
     let l:diags = readfile(l:diags)
   elseif type(l:diags) != type([])
     echoe 'Invalid arg ' . l:diags
-    return
+    return -1
   endif
   
   " according to mode, create t: or b: var
@@ -430,15 +437,15 @@ func! s:ShowDiagnostics(diags, mode, maxheight)
     if !empty(l:diags)  " split a new window
       exe 'silent keepalt keepjumps keepmarks ' .l:sp. ' sbuffer ' .l:diags_bufnr
     else
-      return
+      return -1
     endif
-  else " goto diag window
+  else " goto diag window  no matter diagnostics is empty or not
+    exe l:diags_winnr . 'wincmd w'
     if empty(l:diags) " hide the diag window then restore cursor and !!RETURN!!
-      exe l:diags_winnr . 'wincmd w'
       hide
       " back to current window
       exe bufwinnr(l:cbuf) . 'wincmd w'
-      return
+      return l:diags_winnr
     endif
   endif
 
@@ -479,17 +486,36 @@ func! s:ShowDiagnostics(diags, mode, maxheight)
 
   " back to current window
   exe bufwinnr(l:cbuf) . 'wincmd w'
+  return bufwinnr(l:diags_bufnr)
 endf
 "}}}
 "{{{  s:ShowDiagnosticsAndClear
 " This function will do clear diagnostics after calling ShowDiagnostics.
 " This is required because if I do quit the diagnostics window, what I 
 " want is to ignore this errors, so we should clear all diagnostics
+"
+" Buffer varialbe
+"   b:clang_diags_winnr   <= save
 func! s:ShowDiagnosticsAndClear(diags, mode, maxheight)
-  call s:ShowDiagnostics(a:diags, a:mode, a:maxheight)
+  let b:clang_diags_winnr = s:ShowDiagnostics(a:diags, a:mode, a:maxheight)
   if ! empty(a:diags)
     call remove(a:diags, 0, -1)
   endif
+endf
+"}}}
+"{{{ s:CloseDiagnosticsWindow
+" Close diagnostics and preview window
+"
+" Buffer varialbe
+"   b:clang_diags_winnr   <= use
+func! s:CloseDiagnosticsWindow()
+  if exists('b:clang_diags_winnr') && b:clang_diags_winnr != -1
+    let l:cwn = bufwinnr(bufnr('%'))
+    exe b:clang_diags_winnr . 'wincmd w'
+    hide
+    exe l:cwn . 'wincmd w'
+  endif
+  pclose
 endf
 "}}}
 "{{{ s:ShrinkPrevieWindow
@@ -573,6 +599,9 @@ func! s:ClangCompleteInit()
   com! -nargs=* ClangGenPCHFromFile
         \ call <SID>GenPCH(g:clang_exec, b:clang_options_noPCH, <f-args>)
   
+  com! ClangClosePreviewDiagWindow
+        \ call <SID>CloseDiagnosticsWindow()
+
   " try to find PCH files in clang_root and clang_root/include
   " Or add `-include-pch /path/to/x.h.pch` into the root file .clang manully
   if &filetype ==# 'cpp' && b:clang_options !~# '-include-pch'
@@ -614,10 +643,9 @@ func! s:ClangCompleteInit()
   " and viewport is private for every source buffer.
   " Note: b:clang_diags is created in ClangComplete(...)
   if g:clang_diagsopt =~# '^[bt]:[a-z]\+\(:[0-9]\+\)\?$'
-    let s:cd_i = stridx(g:clang_diagsopt, ':', 2)
-    let s:cd_mode   = g:clang_diagsopt[0 : s:cd_i-1]
-    let s:cd_height = g:clang_diagsopt[s:cd_i+1 : -1]
-    let b:clang_diags = []
+    let l:i = stridx(g:clang_diagsopt, ':', 2)
+    let s:cd_mode   = g:clang_diagsopt[0 : l:i-1]
+    let s:cd_height = g:clang_diagsopt[l:i+1 : -1]
     if exists("##CompleteDone")
       " Automatically show clang diagnostics after completion.
       au CompleteDone <buffer> 
