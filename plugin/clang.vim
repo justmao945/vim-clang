@@ -98,7 +98,10 @@
 " TODO:
 "   1. Private members filter
 "   2. Remove OmniComplete .... Pattern Not Found error?...
-"   3. Test cases
+"      * This has been fixed in asynchronized mode, because I can control the
+"        completion action.
+"   3. Test cases....
+"      * Really hard to do this automatically, just test manually.
 "
 " Issues:
 "   1. When complete an identifier only has a char, the char will be deleted by
@@ -108,7 +111,8 @@
 " References:
 "   [1] http://clang.llvm.org/docs/
 "   [2] VIM help file
-"   [3] VIM scripts [vim-buffergator, clang_complete]
+"   [3] VIM scripts [vim-buffergator, clang_complete, AsyncCommand,
+"                    vim-marching]
 "}}}
 "{{{ Global initialization
 if exists('g:clang_loaded')
@@ -329,9 +333,9 @@ func! s:ParseCompletePoint()
     endwhile
    
     let l:ismber = 0
-    if l:line[l:col - 1] == '.'
-        \ || (l:line[l:col - 1] == '>' && l:line[l:col - 2] == '-')
-        \ || (l:line[l:col - 1] == ':' && l:line[l:col - 2] == ':' && &filetype == 'cpp')
+    if (l:col >= 1 && l:line[l:col - 1] == '.')
+        \ || (l:col >= 2 && l:line[l:col - 1] == '>' && l:line[l:col - 2] == '-')
+        \ || (l:col >= 2 && l:line[l:col - 1] == ':' && l:line[l:col - 2] == ':' && &filetype == 'cpp')
       let l:start  = l:col
       let l:ismber = 1
     endif
@@ -414,7 +418,6 @@ endf
 " @return -1 or window number
 func! s:ShowDiagnostics(diags, mode, maxheight)
   let l:diags = a:diags
-
   if type(l:diags) == type('') " diagnostics file name
     let l:diags = readfile(l:diags)
   elseif type(l:diags) != type([])
@@ -554,6 +557,8 @@ endf
 "  
 "  Usable vars after return:
 "     b:clang_diags => diagnostics created by clang
+"     s:clang_diags_mode => updated mode used by ShowDiagnosticsAndClear
+"     s:clang_diags_height => update max height of diagnostics window
 "     b:clang_isCompleteDone_0/1  => used when CompleteDone event not available
 "     b:clang_options => parepared clang cmd options
 "     b:clang_options_noPCH  => same as b:clang_options except no pch options
@@ -644,19 +649,20 @@ func! s:ClangCompleteInit()
   " Note: b:clang_diags is created in ClangComplete(...)
   if g:clang_diagsopt =~# '^[bt]:[a-z]\+\(:[0-9]\+\)\?$'
     let l:i = stridx(g:clang_diagsopt, ':', 2)
-    let s:cd_mode   = g:clang_diagsopt[0 : l:i-1]
-    let s:cd_height = g:clang_diagsopt[l:i+1 : -1]
+    let s:clang_diags_mode   = g:clang_diagsopt[0 : l:i-1]
+    let s:clang_diags_height = g:clang_diagsopt[l:i+1 : -1]
+    let b:clang_diags = [] " init empty diags
     if exists("##CompleteDone")
       " Automatically show clang diagnostics after completion.
       au CompleteDone <buffer> 
-            \ call <SID>ShowDiagnosticsAndClear(b:clang_diags, s:cd_mode, s:cd_height)
+            \ call <SID>ShowDiagnosticsAndClear(b:clang_diags, s:clang_diags_mode, s:clang_diags_height)
     else
       " FIXME I don't know why VIM escapes after press a key when the
       " completion pattern not found...
       let b:clang_isCompleteDone_1 = 0
       au CursorMovedI <buffer>
             \ if b:clang_isCompleteDone_1 |
-            \   call <SID>ShowDiagnosticsAndClear(b:clang_diags, s:cd_mode, s:cd_height) |
+            \   call <SID>ShowDiagnosticsAndClear(b:clang_diags, s:clang_diags_mode, s:clang_diags_height) |
             \   let b:clang_isCompleteDone_1 = 0 |
             \ endif
     endif
@@ -696,7 +702,7 @@ func! s:ExecuteClang(root, clang_exe, clang_options, line, col, vim_exe)
     call system(l:command)
     let l:res = s:DeleteAfterReadTmps(l:tmps)
   else
-    let l:keys = printf('<Esc>:call ExecuteClangDone(\"%s\",\"%s\")<Enter><Esc>a<C-x><C-o>', l:tmps[0], l:tmps[1])
+    let l:keys = printf('<Esc>:call ExecuteClangDone(\"%s\",\"%s\")<Enter>', l:tmps[0], l:tmps[1])
     let l:vcmd = printf('%s -s --noplugin --servername %s --remote-send "%s"', a:vim_exe, v:servername, l:keys)
     let l:command = '('.l:command.';'.l:vcmd.') &'
     call system(l:command)
@@ -714,11 +720,27 @@ endf
 "       'stdout':  // updated in async mode
 "       'stderr':  // updated in async mode
 "     }
+"     b:clang_diags <= use which created in ClangComplete
+"
+" Script vars:
+"   s:clang_diags_mode
+"   s:clang_diags_height
 func! ExecuteClangDone(tmp1, tmp2)
   let l:res = s:DeleteAfterReadTmps([a:tmp1, a:tmp2])
   let b:clang_state['state'] = 'sync'
   let b:clang_state['stdout'] = l:res[0]
   let b:clang_state['stderr'] = l:res[1]
+  if ! empty(l:res[0])
+    call feedkeys("\<Esc>a\<C-x>\<C-o>")
+  else
+    " As the default action of <C-x><C-o> causes a 'pattern not found'
+    " when the result is empty, which break our input, that's really painful...
+    call ClangComplete(0, ClangComplete(1, 0))
+    if exists('b:clang_diags') && exists('s:clang_diags_mode') && exists('s:clang_diags_height')
+      call s:ShowDiagnosticsAndClear(b:clang_diags, s:clang_diags_mode, s:clang_diags_height)
+    endif
+    call feedkeys("\<Esc>a")
+  endif
 endf
 " }}}
 "{{{ ClangComplete
@@ -753,6 +775,10 @@ func! ClangComplete(findstart, base)
     endif
     
     let [l:start, l:base] = s:ParseCompletePoint()
+    if l:start < 0
+      return l:start  " this is the cancel mode
+    endif
+    
     let l:line    = line('.')
     let l:col     = l:start + 1
     let l:getline = getline('.')[0 : l:col-2]
