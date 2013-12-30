@@ -722,8 +722,11 @@ func! s:ExecuteClang(root, clang_exe, clang_options, line, col, vim_exe)
     call system(l:command)
     let l:res = s:DeleteAfterReadTmps(l:tmps)
   else
-    let l:keys = printf('<Esc>:call ExecuteClangDone(\"%s\",\"%s\")<Enter>', l:tmps[0], l:tmps[1])
-    let l:vcmd = printf('%s -s --noplugin --servername %s --remote-send "%s"', a:vim_exe, v:servername, l:keys)
+    " Please note that '--remote-expr' executes expressions in server, but
+    " '--remote-send' only sends keys, which is same as type keys in server...
+    " Here occurs a bug if uses '--remote-send', the 'col(".")' is not right.
+    let l:keys = printf('ClangExecuteDone(\"%s\",\"%s\")', l:tmps[0], l:tmps[1])
+    let l:vcmd = printf('%s -s --noplugin --servername %s --remote-expr "%s"', a:vim_exe, v:servername, l:keys)
     let l:command = '('.l:command.';'.l:vcmd.') &'
     call system(l:command)
   endif
@@ -733,7 +736,7 @@ func! s:ExecuteClang(root, clang_exe, clang_options, line, col, vim_exe)
   return l:res
 endf
 "}}}
-" {{{ ExecuteClangDone
+" {{{ ClangExecuteDone
 " Buffer vars:
 "     b:clang_state => {
 "       'state' :  // updated to 'sync' in async mode
@@ -748,7 +751,7 @@ endf
 "
 " FIXME: global var:
 "   g:clang_statusline
-func! ExecuteClangDone(tmp1, tmp2)
+func! ClangExecuteDone(tmp1, tmp2)
   let l:res = s:DeleteAfterReadTmps([a:tmp1, a:tmp2])
   let b:clang_state['state'] = 'sync'
   let b:clang_state['stdout'] = l:res[0]
