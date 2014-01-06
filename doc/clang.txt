@@ -1,0 +1,150 @@
+*clang.txt*        Code completion for C/C++
+
+CONTENTS                                        *clang-contents*
+Introduction                                    |clang-introduction|
+Config                                          |clang-config|
+Variables                                       |clang-variables|
+Commands                                        |clang-commands|
+FAQ                                             |clang-faq|
+Changelog                                       |clang-changelog|
+Credits                                         |clang-credits|
+==============================================================================
+INTRODUCTION                                    *clang-introduction*
+This is a plugin to complete C/C++ source code using Clang. 
+
+- Requirements
+    - Executable
+        Clang   - htt://clang.llvm.org
+
+==============================================================================
+CONFIG                                          *clang-config*
+
+
+==============================================================================
+VARIABLES                                       *clang-variables*
+
+g:clang_auto                            *g:clang_auto*
+        If equals to 1, automatically complete after ->, ., ::
+    Default: >
+        let g:clang_auto = 1
+<
+g:clang_c_options                       *g:clang_c_options*
+        Option added at the end of clang command for C sources.
+    Default: >
+        let g:clang_c_options = ''
+<
+g:clang_cpp_options                     *g:clang_cpp_options*
+        Option added at the end of clang command for C++ sources.
+    Default: >
+        let g:clang_cpp_options = ''
+<
+    To support c++0x features and use libcxx: >
+        let g:clang_cpp_options = '-std=c++ -stdlib=libc++'
+<
+g:clang_dotfile                         *g:clang_dotfile*
+        Each project can have a dot file at his root, containing 
+        the compiler options. This is useful if you're using some
+        non-standard include paths.
+        Note: Relative include and library path is recommended.
+    Default: >
+        let g:clang_dotfile = '.clang'
+<
+g:clang_exec                            *g:clang_exec*
+        Name or path of executable clang. Use this if clang has a
+        non-standard name, or isn't in the path.
+    Default: >
+        let g:clang_exec = 'clang'
+<
+g:clang_diagsopt                        *g:clang_diagsopt*
+        This option is a string combined with split mode, colon, 
+        and max height of split window. Colon and max height are
+        optional.
+        e.g. >
+            let g:clang_diagsopt = 'b:rightbelow:6'
+            let g:clang_diagsopt = 'b:rightbelow'
+            let g:clang_diagsopt = ''   " <- this disable diagnostics
+<
+        If it equals '', disable clang diagnostics after completion,
+        otherwise diagnostics will be put in a split window/viewport.
+        Split policy indicators and their corresponding modes are: >
+            " disable diagnostics window
+            let g:clang_diagsopt = '' 
+
+            " split SCREEN horizontally, with new split on the top
+            let g:clang_diagsopt = 't:topleft'
+
+            " split SCREEN horizontally, with new split on the bottom
+            let g:clang_diagsopt = 't:botright'
+            
+            " split VIEWPORT horizontally, with new split on the bottom
+            let g:clang_diagsopt = 'b:rightbelow'
+
+            " split VIEWPORT horizontally, with new split on the top
+            let g:clang_diagsopt = 'b:leftabove' 
+<
+        Note: Split modes are indicated by a single letter. Upper-case
+        letters indicate that the SCREEN (i.e., the entire application
+        "window" from the operating system's perspective) should be 
+        split, while lower-case letters indicate that the VIEWPORT 
+        (i.e., the "window" in Vim's terminology, referring to the
+        various subpanels or splits within Vim) should be split.
+    Default: >
+        let g:clang_diagsopt = 'b:rightbelow:6'
+<
+g:clang_pwheight                        *g:clang_pwheight*
+        Maximum height of completion preview window if has it.
+    Default: >
+        let g:clang_pwheight = 4
+<
+g:clang_statusline                      *g:clang_statusline*
+        Status line showed in preview window and diagnostics window.
+        The first %s is the place to hold messages generated from clang.
+    Default: >
+        " Something like '1 error generated. | 1/5 | 20%'
+        let g:clang_statusline = '%s\ \|\ %%l/\%%L\ \|\ %%p%%%%'
+<
+g:clang_stdafx_h                        *g:clang_stdafx_h*
+        Clang default header file name to generate PCH. Clang will find
+        the stdafx header to speed up completion. 
+        Note: Only find this file in clang root and its sub directory
+        "include". If it is not in mentioned dirs, it must be defined
+        in the dotclang file "-include-pch /path/to/stdafx.h.pch".
+        Additionally, only find PCH file stdafx for C++, but not for C.
+    Default: >
+        let g:clang_stdafx_h = 'stdafx.h'
+<
+g:clang_vim_exec                        *g:clang_vim_exec*
+        Name or path of executable vim.
+        Note: This is option is used in async mode to startup a new vim
+        process. Please add vim to your system PATH or overwrite this var.
+        Attention that default the command 'vim' will not act as a server,
+        instead you must add '--servername XX' to start a unique server.
+    Default: >
+        let g:clang_vim_exec = 'vim'
+<
+==============================================================================
+COMMANDS                                         *clang-commands*
+
+ClangGenPCHFromFile <stdafx.h>          *ClangGenPCHFromFile*
+        Generate PCH file from the give file name <stdafx.h>, which can
+        be % (aka current file name).
+
+ClangClosePreviewDiagWindow             *ClangClosePreviewDiagWindow*
+        Close preview and diagnostics window for current buffer.
+        Or uses a leader map to do this this: >
+            map <silent> <Leader>c <Esc>:ClangClosePreviewDiagWindow<CR>
+<
+
+==============================================================================
+FAQ                                              *clang-faq*
+
+==============================================================================
+CHANGELOG                                        *clang-changelog*
+
+==============================================================================
+CREDITS                                          *clang-credits*
+
+Thanks to the following people for suggestions and patches:
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl

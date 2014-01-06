@@ -69,8 +69,7 @@ Installation
 
 Options and Commands
 --------------------
-See file `plugin/clang.vim`
-
+`:h clang.txt`
 
 OS requirement
 --------------------

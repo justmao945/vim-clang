@@ -4,92 +4,6 @@
 " Authors:     2013~     Jianjun Mao <justmao945@gmail.com>
 "
 " Description: Use of clang to parse in C/C++ source files.
-"
-" Options:
-"  - g:clang_auto
-"       If equals to 1, automatically complete after ->, ., ::
-"       Default: 1
-"
-"  - g:clang_c_options
-"       Option added at the end of clang command for C sources.
-"       Default: ''
-"
-"  - g:clang_cpp_options
-"       Option added at the end of clang command for C++ sources.
-"       Default: ''
-"       Note: Add "-std=c++11" to support C++0x features
-"             Add "-stdlib=libc++" to use libcxx
-"
-"  - g:clang_dotfile
-"       Each project can have a dot file at his root, containing the compiler
-"       options. This is useful if you're using some non-standard include paths.
-"       Default: '.clang'
-"       Note: Relative include and library path is recommended.
-"
-"  - g:clang_exec
-"       Name or path of executable clang.
-"       Default: 'clang'
-"       Note: Use this if clang has a non-standard name, or isn't in the path.
-"   
-"  - g:clang_vim_exec
-"       Name or path of executable vim.
-"       Default: 'vim'
-"       Note: This is option is used in async mode to startup a new vim
-"       process. Please add vim to your system PATH or overwrite this var.
-"       Please note that default the command 'vim' will not act as a server,
-"       instead you must add '--servername XX' to start a unique server.
-"
-"  - g:clang_pwheight
-"       Maximum height of completion preview window if has it.
-"       Default: 4
-"
-"  - g:clang_diagsopt
-"       This option is a string combined with split mode, colon, and max height
-"       of split window. Colon and max height are optional.
-"       e.g.
-"         let g:clang_diagsopt = 'b:rightbelow:6'
-"         let g:clang_diagsopt = 'b:rightbelow'
-"         let g:clang_diagsopt = ''   " <- this disable diagnostics
-"       If it equals '', disable clang diagnostics after completion, otherwise
-"       diagnostics will be put in a split window/viewport.
-"       Split policy indicators and their corresponding modes are:
-"       ''            :disable diagnostics window
-"       't:topleft'   :split SCREEN horizontally, with new split on the top
-"       't:botright'  :split SCREEN horizontally, with new split on the bottom
-"       'b:rightbelow':split VIEWPORT horizontally, with new split on the bottom
-"       'b:leftabove' :split VIEWPORT horizontally, with new split on the top
-"       Default: 'b:rightbelow:6'
-"       Note: Split modes are indicated by a single letter. Upper-case letters
-"             indicate that the SCREEN (i.e., the entire application "window" 
-"             from the operating system's perspective) should be split, while
-"             lower-case letters indicate that the VIEWPORT (i.e., the "window"
-"             in Vim's terminology, referring to the various subpanels or 
-"             splits within Vim) should be split.
-"
-"  - g:clang_statusline
-"       Status line showed in preview window and diagnostics window.
-"       The first %s is the place to hold messages generated from clang.
-"       Default: '%s\ \|\ %%l/\%%L\ \|\ %%p%%%%'
-"                Something like   "1 error generated. | 1/5 | 20%"
-"
-"  - g:clang_stdafx_h
-"       Clang default header file name to generate PCH. Clang will find the
-"       stdafx header to speed up completion.
-"       Default: stdafx.h
-"       Note: Only find this file in clang root and its sub directory "include".
-"             If it is not in mentioned dirs, it must be defined in the dotclang
-"             file "-include-pch /path/to/stdafx.h.pch".
-"             Additionally, only find PCH file stdafx for C++, but not for C.
-"
-" Commands:
-"  - ClangGenPCHFromFile <stdafx.h>
-"       Generate PCH file from the give file name <stdafx.h>, which can be %
-"       (aka current file name).
-"
-"  - ClangClosePreviewDiagWindow
-"       Close preview and diagnostics window for current buffer.
-"       Or uses a leader map to do this this
-"         map <silent> <Leader>c <Esc>:ClangClosePreviewDiagWindow<CR>
 " Notes:
 "   1. Make sure `clang` is available in path when g:clang_exec is empty
 "
@@ -102,7 +16,6 @@
 "         au BufEnter *.cc,*.cpp,*.hh,*hpp set completeopt+=preview
 "         au BufEnter *.c,*.h set completeopt-=preview
 "      to .vimrc
-"
 " TODO:
 "   1. Private members filter
 "   2. Remove OmniComplete .... Pattern Not Found error?...
