@@ -142,6 +142,17 @@ func! s:CompleteColon()
   return ':'
 endf
 "}}}
+"{{{ s:Debug
+" Uses 'echom' to preserve @info when g:clang_debug is not 0.
+" Call ':messages' to see debug info
+" @head Prefix of debug info
+" @info Can be a string list, string, or dict
+func! s:Debug(head, info)
+  if g:clang_debug
+    echom printf("Clang: debug: %s >>> %s", string(head), string(info))
+  endif
+endf
+"}}}
 " {{{ s:DeleteAfterReadTmps
 " @tmps Tmp files name list
 " @return a list of read files
@@ -204,22 +215,6 @@ endf
 "}}}
 " {{{ s:EchoMList
 func! s:EchoMList(list)
-  if type(a:list) != type([])
-    echoe "Inavlid arg"
-  endif
-  if empty(a:list)
-    echom '[]'
-  else
-    echom '['
-    for l:line in a:list
-      if type(l:line) == type('')
-        echom printf("  %s,", l:line)
-      else
-        echom "  ???,"
-      endif
-    endfor
-    echom ']'
-  endif
 endf
 " }}}
 "{{{  s:GenPCH
@@ -325,9 +320,7 @@ func! s:ParseCompletePoint()
     if ! l:ismber && empty(l:base)
       return [-3, l:base]
     endif
-    if g:clang_debug
-      echom printf("ParseCompletePoint >>> start: %s, base: %s", l:start, l:base)
-    endif
+    call s:Debug("ParseCompletePoint", printf("start: %s, base: %s", l:start, l:base))
     return [l:start, l:base]
 endf
 " }}}
@@ -407,9 +400,7 @@ func! s:ShowDiagnostics(diags)
   let l:diags_winnr = bufwinnr(l:diags_bufnr)
   if l:diags_winnr == -1
     if !empty(l:diags)  " split a new window
-      if g:clang_debug
-        echom "ShowDiagnostics >>> split diagnostics window"
-      endif
+      call s:Debug("ShowDiagnostics", "split diagnostics window")
       exe 'silent keepalt keepjumps keepmarks ' .l:mode. ' sbuffer ' .l:diags_bufnr
     else
       return -1
@@ -417,9 +408,7 @@ func! s:ShowDiagnostics(diags)
   else " goto diag window  no matter diagnostics is empty or not
     exe l:diags_winnr . 'wincmd w'
     if empty(l:diags) " hide the diag window then restore cursor and !!RETURN!!
-      if g:clang_debug
-        echom "ShowDiagnostics >>> hide diagnostics window"
-      endif
+      call s:Debug("ShowDiagnostics", "hide diagnostics window")
       hide
       " back to current window
       exe bufwinnr(l:cbuf) . 'wincmd w'
@@ -548,11 +537,10 @@ func! s:ClangCompleteInit()
   let b:clang_options_noPCH = b:clang_options
 
   " Create GenPCH command
-  com! -nargs=* ClangGenPCHFromFile
-        \ call <SID>GenPCH(g:clang_exec, b:clang_options_noPCH, <f-args>)
+  com! -nargs=* ClangGenPCHFromFile call <SID>GenPCH(g:clang_exec, b:clang_options_noPCH, <f-args>)
   
-  com! ClangClosePreviewDiagWindow
-        \ call <SID>CloseDiagnosticsWindow()
+  " Create close diag window command
+  com! ClangClosePreviewDiagWindow  call <SID>CloseDiagnosticsWindow()
 
   " try to find PCH files in clang_root and clang_root/include
   " Or add `-include-pch /path/to/x.h.pch` into the root file .clang manully
@@ -579,9 +567,7 @@ func! s:ClangCompleteInit()
 
   " CompleteDone event is available since version 7.3.598
   if exists("##CompleteDone")
-    if g:clang_debug
-      au CompleteDone <buffer> echom '##CompleteDone'
-    endif
+    au CompleteDone <buffer> call <SID>Debug("##CompleteDone", "triggered")
     " Automatically resize preview window after completion.
     " Default assume preview window is above of the editing window.
     au CompleteDone <buffer> call <SID>ShrinkPrevieWindow()
@@ -598,8 +584,12 @@ func! s:ClangCompleteInit()
   au BufWinLeave <buffer> call <SID>CloseDiagnosticsWindow()
 endf
 "}}}
-"{{{ s:ExecuteClang
+"{{{ s:ClangExecute
 " Execute clang binary to generate completions and diagnostics.
+" Global variable:
+"     g:clang_exec
+"     g:clang_vim_exec
+"
 " Buffer vars:
 "     b:clang_state => {
 "       'state' :  // updated to 'ready' in sync mode
@@ -611,7 +601,7 @@ endf
 " @line Line to complete
 " @col Column to complete
 " @return [completion, diagnostics]
-func! s:ExecuteClang(root, clang_options, line, col)
+func! s:ClangExecute(root, clang_options, line, col)
   let l:cwd = fnameescape(getcwd())
   exe 'lcd ' . a:root
   let l:src = fnameescape(expand('%:p:.'))  " Thanks RageCooky, fix when a path has spaces.
@@ -628,12 +618,8 @@ func! s:ExecuteClang(root, clang_options, line, col)
     let b:clang_state['state'] = 'ready'
     call system(l:command)
     let l:res = s:DeleteAfterReadTmps(l:tmps)
-    if g:clang_debug
-      echom "ClangExecute >>> stdout"
-      call s:EchoMList(l:res[0])
-      echom "ClangExecute >>> stderr"
-      call s:EchoMList(l:res[1])
-    endif
+    call s:Debug("ClangExecute::stdout", l:res[0])
+    call s:Debug("ClangExecute::stderr", l:res[1])
   else
     " Please note that '--remote-expr' executes expressions in server, but
     " '--remote-send' only sends keys, which is same as type keys in server...
@@ -651,30 +637,21 @@ func! s:ExecuteClang(root, clang_options, line, col)
 endf
 "}}}
 " {{{ ClangExecuteDone
+" Called by vim-client when clang is returned in asynchronized mode.
+"
 " Buffer vars:
 "     b:clang_state => {
 "       'state' :  // updated to 'sync' in async mode
 "       'stdout':  // updated in async mode
 "       'stderr':  // updated in async mode
 "     }
-"
-" Script vars:
-"   s:clang_diags_mode
-"   s:clang_diags_height
-"
-" FIXME: global var:
-"   g:clang_statusline
 func! ClangExecuteDone(tmp1, tmp2)
   let l:res = s:DeleteAfterReadTmps([a:tmp1, a:tmp2])
   let b:clang_state['state'] = 'sync'
   let b:clang_state['stdout'] = l:res[0]
   let b:clang_state['stderr'] = l:res[1]
-  if g:clang_debug
-    echom "ClangExecuteDone >>> stdout"
-    call s:EchoMList(l:res[0])
-    echom "ClangExecuteDone >>> stderr"
-    call s:EchoMList(l:res[1])
-  endif
+  call s:Debug("ClangExecuteDone::stdout", l:res[0])
+  call s:Debug("ClangExecuteDone::stderr", l:res[1])
   call feedkeys("\<Esc>a")
   " As the default action of <C-x><C-o> causes a 'pattern not found'
   " when the result is empty, which break our input, that's really painful...
@@ -706,9 +683,7 @@ endf
 "    }
 func! ClangComplete(findstart, base)
   if a:findstart
-    if g:clang_debug
-      echom "ClangComplete >>> phase 1"
-    endif
+    call s:Debug("ClangComplete", "phase 1")
     if !exists('b:clang_state')
       let b:clang_state = { 'state': 'ready', 'stdout': [], 'stderr': [] }
     endif
@@ -724,9 +699,7 @@ func! ClangComplete(findstart, base)
     let l:line    = line('.')
     let l:col     = l:start + 1
     let l:getline = getline('.')[0 : l:col-2]
-    if g:clang_debug
-      echom printf("ClangComplete >>> line: %s, col: %s, getline: %s", l:line, l:col, l:getline)
-    endif
+    call s:Debug("ClangComplete", printf("line: %s, col: %s, getline: %s", l:line, l:col, l:getline))
     
     " Cache parsed result into b:clang_cache
     " Reparse source file when:
@@ -744,15 +717,12 @@ func! ClangComplete(findstart, base)
           \ || ! empty(b:clang_cache['diagnostics'])
           \ || ! empty(b:clang_state['stderr'])
       let b:clang_cache = {'col': l:col, 'line': l:line, 'getline': l:getline}
-      if g:clang_debug
-        echom "ClangComplete >>> update b:clang_cache"
-        echom "    state: " . b:clang_state['state']
-      endif
+      call s:Debug("ClangComplete::state", b:clang_state['state'])
       " update state machine
       if b:clang_state['state'] == 'ready'
         let b:clang_state['state'] = 'busy'
         silent update " buggy when update in the second phase ?
-        call s:ExecuteClang(b:clang_root, b:clang_options, l:line, l:col)
+        call s:ClangExecute(b:clang_root, b:clang_options, l:line, l:col)
       elseif b:clang_state['state'] == 'sync'
         let b:clang_state['state'] = 'ready'
       endif
@@ -765,12 +735,11 @@ func! ClangComplete(findstart, base)
     endif
     " update completions by new l:base
     let b:clang_cache['completions'] = s:ParseCompletionResult(b:clang_state['stdout'], l:base)
+    " call to show diagnostics
     call s:ShowDiagnostics(b:clang_cache['diagnostics'])
     return l:start
   else
-    if g:clang_debug
-      echom "ClangComplete >>> phase 2"
-    endif
+    call s:Debug("ClangComplete", "phase 2")
     " Simulate CompleteDone event, see ClangCompleteInit().
     " b:clang_isCompleteDone_X is valid only when CompleteDone event is not available.
     let b:clang_isCompleteDone_0 = 1
