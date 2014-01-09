@@ -60,8 +60,8 @@ g:clang_diagsopt                        *g:clang_diagsopt*
         and max height of split window. Colon and max height are
         optional.
         e.g. >
-            let g:clang_diagsopt = 'b:rightbelow:6'
-            let g:clang_diagsopt = 'b:rightbelow'
+            let g:clang_diagsopt = 'rightbelow:6'
+            let g:clang_diagsopt = 'rightbelow'
             let g:clang_diagsopt = ''   " <- this disable diagnostics
 <
         If it equals '', disable clang diagnostics after completion,
@@ -71,25 +71,19 @@ g:clang_diagsopt                        *g:clang_diagsopt*
             let g:clang_diagsopt = '' 
 
             " split SCREEN horizontally, with new split on the top
-            let g:clang_diagsopt = 't:topleft'
+            let g:clang_diagsopt = 'topleft'
 
             " split SCREEN horizontally, with new split on the bottom
-            let g:clang_diagsopt = 't:botright'
+            let g:clang_diagsopt = 'botright'
             
             " split VIEWPORT horizontally, with new split on the bottom
-            let g:clang_diagsopt = 'b:rightbelow'
+            let g:clang_diagsopt = 'rightbelow'
 
             " split VIEWPORT horizontally, with new split on the top
-            let g:clang_diagsopt = 'b:leftabove' 
+            let g:clang_diagsopt = 'leftabove' 
 <
-        Note: Split modes are indicated by a single letter. Upper-case
-        letters indicate that the SCREEN (i.e., the entire application
-        "window" from the operating system's perspective) should be 
-        split, while lower-case letters indicate that the VIEWPORT 
-        (i.e., the "window" in Vim's terminology, referring to the
-        various subpanels or splits within Vim) should be split.
     Default: >
-        let g:clang_diagsopt = 'b:rightbelow:6'
+        let g:clang_diagsopt = 'rightbelow:6'
 <
 g:clang_pwheight                        *g:clang_pwheight*
         Maximum height of completion preview window if has it.
