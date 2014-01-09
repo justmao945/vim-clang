@@ -91,14 +91,15 @@ au FileType c,cpp call <SID>ClangCompleteInit()
 ""{{{ s:CloseDiagnosticsWindow
 " Close diagnostics and preview window
 "
-" Buffer variable
-"   b:clang_diags_winnr   <= use
+" Tab variable
+"   t:clang_diags_winnr   <= use and clear
 func! s:CloseDiagnosticsWindow()
-  if exists('b:clang_diags_winnr') && b:clang_diags_winnr != -1
+  if exists('t:clang_diags_winnr') && t:clang_diags_winnr != -1
     let l:cwn = bufwinnr(bufnr('%'))
-    exe b:clang_diags_winnr . 'wincmd w'
+    exe t:clang_diags_winnr . 'wincmd w'
     hide
     exe l:cwn . 'wincmd w'
+    let t:clang_diags_winnr = -1  " IMPORTANT, clear the result
   endif
   pclose
 endf
@@ -149,7 +150,7 @@ endf
 " @info Can be a string list, string, or dict
 func! s:Debug(head, info)
   if g:clang_debug
-    echom printf("Clang: debug: %s >>> %s", string(head), string(info))
+    echom printf("Clang: debug: %s >>> %s", string(a:head), string(a:info))
   endif
 endf
 "}}}
@@ -213,10 +214,6 @@ func! s:DiscoverIncludeDirs(clang, options)
   return l:res
 endf
 "}}}
-" {{{ s:EchoMList
-func! s:EchoMList(list)
-endf
-" }}}
 "{{{  s:GenPCH
 " Generate clang precompiled header.
 " A new file with postfix '.pch' will be created if success.
@@ -373,8 +370,9 @@ endf
 " Global variable:
 "   g:clang_diagsopt
 "   g:clang_statusline
-" Buffer variable
-"   b:clang_diags_winnr   <= save
+" Tab variable
+"   t:clang_diags_winnr   <= save
+"   t:clang_diags_bufnr   <= internal save and use
 " @diags A list of lines from clang diagnostics, or a diagnostics file name.
 " @return -1 or window number
 func! s:ShowDiagnostics(diags)
@@ -387,14 +385,14 @@ func! s:ShowDiagnostics(diags)
   endif
   
   let l:i = stridx(g:clang_diagsopt, ':')
-  let l:mode = g:clang_diagsopt[0 : l:i-1]
+  let l:mode      = g:clang_diagsopt[0 : l:i-1]
   let l:maxheight = g:clang_diagsopt[l:i+1 : -1]
 
-  " according to mode, create t: or b: var
-  if !exists('g:clang_diags_bufnr') || !bufexists('g:clang_diags_bufnr')
-    let g:clang_diags_bufnr = bufnr('ClangDiagnostics@' . last_buffer_nr(), 1)
+  " Here uses t:clang_diags_bufnr to keep only one window in a *tab*
+  if !exists('t:clang_diags_bufnr') || !bufexists(t:clang_diags_bufnr)
+    let t:clang_diags_bufnr = bufnr('ClangDiagnostics@' . last_buffer_nr(), 1)
   endif
-  let l:diags_bufnr = g:clang_diags_bufnr
+  let l:diags_bufnr = t:clang_diags_bufnr
   let l:cbuf = bufnr('%')
 
   let l:diags_winnr = bufwinnr(l:diags_bufnr)
@@ -453,8 +451,8 @@ func! s:ShowDiagnostics(diags)
 
   " back to current window
   exe bufwinnr(l:cbuf) . 'wincmd w'
-  let b:clang_diags_winnr = bufwinnr(l:diags_bufnr)
-  return b:clang_diags_winnr
+  let t:clang_diags_winnr = bufwinnr(l:diags_bufnr)
+  return t:clang_diags_winnr
 endf
 "}}}
 "{{{ s:ShrinkPrevieWindow
@@ -580,8 +578,8 @@ func! s:ClangCompleteInit()
           \ endif
   endif
 
-  " Close diagnostics window when leave current buffer window
-  au BufWinLeave <buffer> call <SID>CloseDiagnosticsWindow()
+  " Close diagnostics window when leave/enter old/new buffer window
+  au BufWinLeave,BufWinEnter <buffer> call <SID>CloseDiagnosticsWindow()
 endf
 "}}}
 "{{{ s:ClangExecute
