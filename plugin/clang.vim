@@ -107,6 +107,13 @@ endf
 func! s:Error(head, err)
   echoe printf("Clang: error: %s >>> %s", string(a:head), string(a:err))
 endf
+"{{{ s:Log
+" Uses 'echom' to preserve @info.
+" @head Prefix of log info
+" @info Can be a string list, string, or dict
+func! s:Log(head, info)
+  echom printf("Clang: log: %s >>> %s", string(a:head), string(a:info))
+endf
 "}}}
 ""{{{ s:CloseDiagnosticsWindow
 " Close diagnostics and preview window
@@ -216,7 +223,7 @@ func! s:DiscoverIncludeDirs(clang, options)
     let l:i += 1
   endfor
   
-  let l:clang_output = l:clang_output[l:i+1 : -1]
+  let l:clang_output = l:clang_output[l:i : -1]
   let l:res = []
   for l:line in l:clang_output
     if l:line[0] == ' '
@@ -254,9 +261,9 @@ func! s:GenPCH(clang, options, header)
   let l:clang_output = system(l:command)
 
   if v:shell_error
-    call s:Error("s:GenPCH", {'exit': v:shell_error, 'cmd:' l:command, 'out': l:clang_output })
+    call s:Error("s:GenPCH", {'exit': v:shell_error, 'cmd': l:command, 'out': l:clang_output })
   else
-    echom 'Clang creates PCH flie ' . l:header . '.pch successfully!'
+    call s:Log("s:GenPCH", 'Clang creates PCH flie ' . l:header . '.pch successfully!')
   endif
   return l:clang_output
 endf
