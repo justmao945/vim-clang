@@ -594,6 +594,8 @@ func! s:ClangCompleteInit()
           \ endif
   endif
 
+  " Close diagnostics window when leave current buffer window
+  au BufWinLeave <buffer> call <SID>CloseDiagnosticsWindow()
 endf
 "}}}
 "{{{ s:ExecuteClang
