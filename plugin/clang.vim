@@ -107,6 +107,7 @@ endf
 func! s:Error(head, err)
   echoe printf("Clang: error: %s >>> %s", string(a:head), string(a:err))
 endf
+"}}}
 "{{{ s:Log
 " Uses 'echom' to preserve @info.
 " @head Prefix of log info

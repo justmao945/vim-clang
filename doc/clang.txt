@@ -19,6 +19,25 @@ This is a plugin to complete C/C++ source code using Clang.
 ==============================================================================
 CONFIG                                          *clang-config*
 
+Vim-clang uses a file named ".clang" (same as .clang_complete for clang_complete)
+in the project root to save Clang options. Relative path is recommended when
+configure the include directory, so we can move the project anywhere...
+Here is a tree to show the location of file '.clang'
+.
+├── build/
+├── .clang
+├── CMakeLists.txt
+├── COPYING
+├── .git/
+├── .gitignore
+├── raw-test/
+├── README.md
+├── src/
+├── test/
+└── yacl/
+
+The file ".clang" only contains: "-I." to include files in directory "/".
+So that the source file should uses #include "yacl/xxx.h" to include files.
 
 ==============================================================================
 VARIABLES                                       *clang-variables*
@@ -132,13 +151,36 @@ ClangClosePreviewDiagWindow             *ClangClosePreviewDiagWindow*
 ==============================================================================
 FAQ                                              *clang-faq*
 
+Q: How to open preview window ?
+A: Should add 'set completeopt=longest,menuone,preview' to $HOME/.vimrc .
+
+Q: How to open diagnostics window ?
+A: Diagnostics window will be opened automatically when some errors occured
+   in your source code, and dismissed when they are fixed or change buffers.
+
 ==============================================================================
 CHANGELOG                                        *clang-changelog*
+0.22
+* Change g:clang_diagsopt
+* Show diagnostics window before popup completion window
+* Add debug mode g:clang_debug
+* Fix bugs
+
+0.21
+* Add async mode to execute clang
+* Add g:clang_pwheight, g:clang_statusline, g:clang_vim_exec
+* Add command "ClangClosePreviewDiagWindow"
+* Fix bugs
+
+0.1
+* Initial version
 
 ==============================================================================
 CREDITS                                          *clang-credits*
 
 Thanks to the following people for suggestions and patches:
+* RageCooky
+* yuquan23459
 
 ==============================================================================
 vim:tw=78:ts=8:ft=help:norl
