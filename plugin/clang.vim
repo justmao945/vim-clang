@@ -88,6 +88,26 @@ endif
 " Init on c/c++ files
 au FileType c,cpp call <SID>ClangCompleteInit()
 "}}}
+"{{{ s:Debug
+" Uses 'echom' to preserve @info when g:clang_debug is not 0.
+" Call ':messages' to see debug info
+" @head Prefix of debug info
+" @info Can be a string list, string, or dict
+func! s:Debug(head, info)
+  if g:clang_debug
+    echom printf("Clang: debug: %s >>> %s", string(a:head), string(a:info))
+  endif
+endf
+"}}}
+"{{{ s:Error
+" Uses 'echoe' to preserve @err
+" Call ':messages' to see error messages
+" @head Prefix of error message
+" @err Can be a string list, string, or dict
+func! s:Error(head, err)
+  echoe printf("Clang: error: %s >>> %s", string(a:head), string(a:err))
+endf
+"}}}
 ""{{{ s:CloseDiagnosticsWindow
 " Close diagnostics and preview window
 "
@@ -143,23 +163,12 @@ func! s:CompleteColon()
   return ':'
 endf
 "}}}
-"{{{ s:Debug
-" Uses 'echom' to preserve @info when g:clang_debug is not 0.
-" Call ':messages' to see debug info
-" @head Prefix of debug info
-" @info Can be a string list, string, or dict
-func! s:Debug(head, info)
-  if g:clang_debug
-    echom printf("Clang: debug: %s >>> %s", string(a:head), string(a:info))
-  endif
-endf
-"}}}
 " {{{ s:DeleteAfterReadTmps
 " @tmps Tmp files name list
 " @return a list of read files
 func! s:DeleteAfterReadTmps(tmps)
   if type(a:tmps) != type([])
-    echoe "Invalid arg ". a:tmps
+    call s:Error("s:DeleteAfterReadTmps", "Invalid arg: ". string(a:tmps))
   endif
   let l:res = []
   let l:i = 0
@@ -192,11 +201,16 @@ endf
 " @return List of dirs: ['path1', 'path2', ...]
 func! s:DiscoverIncludeDirs(clang, options)
   let l:command = printf('echo | %s -fsyntax-only -v %s -', a:clang, a:options)
+  call s:Debug("s:DiscoverIncludeDirs::cmd", l:command)
   let l:clang_output = split(system(l:command), "\n")
+  call s:Debug("s:DiscoverIncludeDirs::raw", l:clang_output)
   
   let l:i = 0
+  let l:hit = 0
   for l:line in l:clang_output
     if l:line =~# '^#include'
+      let l:hit = 1
+    elseif l:hit
       break
     endif
     let l:i += 1
@@ -211,6 +225,7 @@ func! s:DiscoverIncludeDirs(clang, options)
       break
     endif
   endfor
+  call s:Debug("s:DiscoverIncludeDirs::parsed", l:clang_output)
   return l:res
 endf
 "}}}
@@ -235,14 +250,13 @@ func! s:GenPCH(clang, options, header)
   endif
   
   let l:command = printf('%s -cc1 %s -emit-pch -o %s.pch %s', a:clang, a:options, l:header, l:header)
+  call s:Debug("s:GenPCH::cmd", l:command)
   let l:clang_output = system(l:command)
 
   if v:shell_error
-    echoe 'Clang returns error ' . v:shell_error
-    echoe l:command
-    echoe l:clang_output
+    call s:Error("s:GenPCH", {'exit': v:shell_error, 'cmd:' l:command, 'out': l:clang_output })
   else
-    echoe 'Clang creates PCH flie ' . l:header . '.pch successfully!'
+    echom 'Clang creates PCH flie ' . l:header . '.pch successfully!'
   endif
   return l:clang_output
 endf
@@ -294,8 +308,8 @@ func! s:ParseCompletePoint()
         let l:base = l:line[l:col : l:start-1]
         let l:start = l:col " reset l:start in case 1
       else
-        echoe 'Can not complete after an invalid identifier <'
-            \. l:line[l:col : l:start-1] . '>'
+        call s:Error("s:ParseCompletePoint", 'Can not complete after an invalid identifier <'
+            \. l:line[l:col : l:start-1] . '>')
         return [-3, l:base]
       endif
     endif
@@ -317,7 +331,7 @@ func! s:ParseCompletePoint()
     if ! l:ismber && empty(l:base)
       return [-3, l:base]
     endif
-    call s:Debug("ParseCompletePoint", printf("start: %s, base: %s", l:start, l:base))
+    call s:Debug("s:ParseCompletePoint", printf("start: %s, base: %s", l:start, l:base))
     return [l:start, l:base]
 endf
 " }}}
@@ -380,7 +394,7 @@ func! s:ShowDiagnostics(diags)
   if type(l:diags) == type('') " diagnostics file name
     let l:diags = readfile(l:diags)
   elseif type(l:diags) != type([])
-    echoe 'Invalid arg ' . l:diags
+    call s:Error("s:ShowDiagnostics", 'Invalid arg ' . string(l:diags))
     return -1
   endif
   
@@ -398,7 +412,7 @@ func! s:ShowDiagnostics(diags)
   let l:diags_winnr = bufwinnr(l:diags_bufnr)
   if l:diags_winnr == -1
     if !empty(l:diags)  " split a new window
-      call s:Debug("ShowDiagnostics", "split diagnostics window")
+      call s:Debug("s:ShowDiagnostics", "split diagnostics window")
       exe 'silent keepalt keepjumps keepmarks ' .l:mode. ' sbuffer ' .l:diags_bufnr
     else
       return -1
@@ -406,7 +420,7 @@ func! s:ShowDiagnostics(diags)
   else " goto diag window  no matter diagnostics is empty or not
     exe l:diags_winnr . 'wincmd w'
     if empty(l:diags) " hide the diag window then restore cursor and !!RETURN!!
-      call s:Debug("ShowDiagnostics", "hide diagnostics window")
+      call s:Debug("s:ShowDiagnostics", "hide diagnostics window")
       hide
       " back to current window
       exe bufwinnr(l:cbuf) . 'wincmd w'
@@ -616,8 +630,8 @@ func! s:ClangExecute(root, clang_options, line, col)
     let b:clang_state['state'] = 'ready'
     call system(l:command)
     let l:res = s:DeleteAfterReadTmps(l:tmps)
-    call s:Debug("ClangExecute::stdout", l:res[0])
-    call s:Debug("ClangExecute::stderr", l:res[1])
+    call s:Debug("s:ClangExecute::stdout", l:res[0])
+    call s:Debug("s:ClangExecute::stderr", l:res[1])
   else
     " Please note that '--remote-expr' executes expressions in server, but
     " '--remote-send' only sends keys, which is same as type keys in server...
