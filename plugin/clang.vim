@@ -53,6 +53,14 @@ if !exists('g:clang_cpp_options')
   let g:clang_cpp_options = ''
 endif
 
+if !exists('g:clang_debug')
+  let g:clang_debug = 1
+endif
+
+if !exists('g:clang_diagsopt')
+  let g:clang_diagsopt = 'b:rightbelow:6'
+endif
+
 if !exists('g:clang_dotfile')
   let g:clang_dotfile = '.clang'
 endif
@@ -61,16 +69,8 @@ if !exists('g:clang_exec')
   let g:clang_exec = 'clang'
 endif
 
-if !exists('g:clang_vim_exec')
-  let g:clang_vim_exec = 'vim'
-endif
-
 if !exists('g:clang_pwheight')
   let g:clang_pwheight = 4
-endif
-
-if !exists('g:clang_diagsopt')
-  let g:clang_diagsopt = 'b:rightbelow:6'
 endif
 
 if !exists('g:clang_statusline')
@@ -79,6 +79,10 @@ endif
 
 if !exists('g:clang_stdafx_h')
   let g:clang_stdafx_h = 'stdafx.h'
+endif
+
+if !exists('g:clang_vim_exec')
+  let g:clang_vim_exec = 'vim'
 endif
 
 " Init on c/c++ files
@@ -121,6 +125,23 @@ func! s:CompleteColon()
     return ":\<C-x>\<C-o>"
   endif
   return ':'
+endf
+"}}}
+" {{{ s:DeleteAfterReadTmps
+" @tmps Tmp files name list
+" @return a list of read files
+func! s:DeleteAfterReadTmps(tmps)
+  if type(a:tmps) != type([])
+    echoe "Invalid arg ". a:tmps
+  endif
+  let l:res = []
+  let l:i = 0
+  while l:i < len(a:tmps)
+    call add(l:res, readfile(a:tmps[ l:i ]))
+    call delete(a:tmps[ l:i ])
+    let l:i = l:i + 1
+  endwhile
+  return l:res
 endf
 "}}}
 "{{{ s:DiscoverIncludeDirs
@@ -166,6 +187,26 @@ func! s:DiscoverIncludeDirs(clang, options)
   return l:res
 endf
 "}}}
+" {{{ s:EchoMList
+func! s:EchoMList(list)
+  if type(a:list) != type([])
+    echoe "Inavlid arg"
+  endif
+  if empty(a:list)
+    echom '[]'
+  else
+    echom '['
+    for l:line in a:list
+      if type(l:line) == type('')
+        echom printf("  %s,", l:line)
+      else
+        echom "  ???,"
+      endif
+    endfor
+    echom ']'
+  endif
+endf
+" }}}
 "{{{  s:GenPCH
 " Generate clang precompiled header.
 " A new file with postfix '.pch' will be created if success.
@@ -269,7 +310,9 @@ func! s:ParseCompletePoint()
     if ! l:ismber && empty(l:base)
       return [-3, l:base]
     endif
-    " echom printf("start: %s, base: %s", l:start, l:base)
+    if g:clang_debug
+      echom printf("ParseCompletePoint >>> start: %s, base: %s", l:start, l:base)
+    endif
     return [l:start, l:base]
 endf
 " }}}
@@ -316,23 +359,6 @@ func! s:ParseCompletionResult(output, base)
   return l:res
 endf
 " }}}
-" {{{ s:DeleteAfterReadTmps
-" @tmps Tmp files name list
-" @return a list of read files
-func! s:DeleteAfterReadTmps(tmps)
-  if type(a:tmps) != type([])
-    echoe "Invalid arg ". a:tmps
-  endif
-  let l:res = []
-  let l:i = 0
-  while l:i < len(a:tmps)
-    call add(l:res, readfile(a:tmps[ l:i ]))
-    call delete(a:tmps[ l:i ])
-    let l:i = l:i + 1
-  endwhile
-  return l:res
-endf
-"}}}
 "{{{ s:ShowDiagnostics
 " Split a window to show clang diagnostics. If there's no diagnostics, close
 " the split window.
@@ -634,6 +660,12 @@ func! s:ExecuteClang(root, clang_exe, clang_options, line, col, vim_exe)
     let b:clang_state['state'] = 'ready'
     call system(l:command)
     let l:res = s:DeleteAfterReadTmps(l:tmps)
+    if g:clang_debug
+      echom "ClangExecute >>> stdout"
+      call s:EchoMList(l:res[0])
+      echom "ClangExecute >>> stderr"
+      call s:EchoMList(l:res[1])
+    endif
   else
     " Please note that '--remote-expr' executes expressions in server, but
     " '--remote-send' only sends keys, which is same as type keys in server...
@@ -669,6 +701,12 @@ func! ClangExecuteDone(tmp1, tmp2)
   let b:clang_state['state'] = 'sync'
   let b:clang_state['stdout'] = l:res[0]
   let b:clang_state['stderr'] = l:res[1]
+  if g:clang_debug
+    echom "ClangExecuteDone >>> stdout"
+    call s:EchoMList(l:res[0])
+    echom "ClangExecuteDone >>> stderr"
+    call s:EchoMList(l:res[1])
+  endif
   call feedkeys("\<Esc>a")
   if ! empty(l:res[0])
     call feedkeys("\<C-x>\<C-o>")
@@ -722,7 +760,9 @@ func! ClangComplete(findstart, base)
     let l:line    = line('.')
     let l:col     = l:start + 1
     let l:getline = getline('.')[0 : l:col-2]
-    " echom printf("line: %s, col: %s, getline: %s", l:line, l:col, l:getline)
+    if g:clang_debug
+      echom printf("ClangComplete >>> line: %s, col: %s, getline: %s", l:line, l:col, l:getline)
+    endif
     
     " Cache parsed result into b:clang_cache
     " Reparse source file when:
