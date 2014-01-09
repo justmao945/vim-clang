@@ -54,7 +54,7 @@ if !exists('g:clang_cpp_options')
 endif
 
 if !exists('g:clang_debug')
-  let g:clang_debug = 1
+  let g:clang_debug = 0
 endif
 
 if !exists('g:clang_diagsopt')
@@ -778,6 +778,7 @@ func! ClangComplete(findstart, base)
           \ || b:clang_cache['line']    !=  l:line
           \ || b:clang_cache['getline'] !=# l:getline
           \ || ! empty(b:clang_cache['diagnostics'])
+          \ || ! empty(b:clang_state['stderr'])
       let b:clang_cache = {'col': l:col, 'line': l:line, 'getline': l:getline}
       " update state machine
       if b:clang_state['state'] == 'ready'
