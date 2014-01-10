@@ -93,8 +93,14 @@ au FileType c,cpp call <SID>ClangCompleteInit()
 " Call ':messages' to see debug info
 " @head Prefix of debug info
 " @info Can be a string list, string, or dict
-func! s:Debug(head, info)
-  if g:clang_debug
+" @lv   Debug level, write info only when lv < g:clang_debug, deault is 1
+func! s:Debug(head, info, ...)
+  if a:0 > 1 && a:1 > 1
+    let l:lv = a:1
+  else
+    let l:lv = 1
+  endif
+  if l:lv <= g:clang_debug
     echom printf("Clang: debug: %s >>> %s", string(a:head), string(a:info))
   endif
 endf
@@ -123,6 +129,7 @@ endf
 "   t:clang_diags_winnr   <= use and clear
 func! s:CloseDiagnosticsWindow()
   if exists('t:clang_diags_winnr') && t:clang_diags_winnr != -1
+    call s:Debug("s:CloseDiagnosticsWindow", t:clang_diags_winnr)
     let l:cwn = bufwinnr(bufnr('%'))
     exe t:clang_diags_winnr . 'wincmd w'
     hide
@@ -209,9 +216,9 @@ endf
 " @return List of dirs: ['path1', 'path2', ...]
 func! s:DiscoverIncludeDirs(clang, options)
   let l:command = printf('echo | %s -fsyntax-only -v %s -', a:clang, a:options)
-  call s:Debug("s:DiscoverIncludeDirs::cmd", l:command)
+  call s:Debug("s:DiscoverIncludeDirs::cmd", l:command, 2)
   let l:clang_output = split(system(l:command), "\n")
-  call s:Debug("s:DiscoverIncludeDirs::raw", l:clang_output)
+  call s:Debug("s:DiscoverIncludeDirs::raw", l:clang_output, 2)
   
   let l:i = 0
   let l:hit = 0
@@ -233,7 +240,7 @@ func! s:DiscoverIncludeDirs(clang, options)
       break
     endif
   endfor
-  call s:Debug("s:DiscoverIncludeDirs::parsed", l:clang_output)
+  call s:Debug("s:DiscoverIncludeDirs::parsed", l:clang_output, 2)
   return l:res
 endf
 "}}}
@@ -258,7 +265,7 @@ func! s:GenPCH(clang, options, header)
   endif
   
   let l:command = printf('%s -cc1 %s -emit-pch -o %s.pch %s', a:clang, a:options, l:header, l:header)
-  call s:Debug("s:GenPCH::cmd", l:command)
+  call s:Debug("s:GenPCH::cmd", l:command, 2)
   let l:clang_output = system(l:command)
 
   if v:shell_error
@@ -638,8 +645,8 @@ func! s:ClangExecute(root, clang_options, line, col)
     let b:clang_state['state'] = 'ready'
     call system(l:command)
     let l:res = s:DeleteAfterReadTmps(l:tmps)
-    call s:Debug("s:ClangExecute::stdout", l:res[0])
-    call s:Debug("s:ClangExecute::stderr", l:res[1])
+    call s:Debug("s:ClangExecute::stdout", l:res[0], 2)
+    call s:Debug("s:ClangExecute::stderr", l:res[1], 2)
   else
     " Please note that '--remote-expr' executes expressions in server, but
     " '--remote-send' only sends keys, which is same as type keys in server...
@@ -670,8 +677,8 @@ func! ClangExecuteDone(tmp1, tmp2)
   let b:clang_state['state'] = 'sync'
   let b:clang_state['stdout'] = l:res[0]
   let b:clang_state['stderr'] = l:res[1]
-  call s:Debug("ClangExecuteDone::stdout", l:res[0])
-  call s:Debug("ClangExecuteDone::stderr", l:res[1])
+  call s:Debug("ClangExecuteDone::stdout", l:res[0], 2)
+  call s:Debug("ClangExecuteDone::stderr", l:res[1], 2)
   call feedkeys("\<Esc>a")
   " As the default action of <C-x><C-o> causes a 'pattern not found'
   " when the result is empty, which break our input, that's really painful...
