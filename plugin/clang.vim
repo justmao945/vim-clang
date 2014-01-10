@@ -276,16 +276,18 @@ func! s:DiagnosticsWindowOpen(diags)
 
   let t:clang_diags_winnr = bufwinnr(t:clang_diags_bufnr)
   if t:clang_diags_winnr == -1
-    if ! empty(l:diags)  " split a new window
-      call s:PDebug("s:DiagnosticsWindowOpen", "split window")
+    if ! empty(l:diags)  " split a new window, go into it automatically
       exe 'silent keepalt keepjumps keepmarks ' .l:mode. ' sbuffer ' . t:clang_diags_bufnr
       " IMPORTANT!! update winnr
       let t:clang_diags_winnr = bufwinnr(t:clang_diags_bufnr)
+      call s:PDebug("s:DiagnosticsWindowOpen", t:clang_diags_winnr)
     else
-      return -1
+      return -1 " empty result, return
     endif
-  elseif empty(l:diags)
+  elseif empty(l:diags) " just close window and return
     return s:DiagnosticsWindowClose()
+  else " goto the exist window
+    exe t:clang_diags_winnr . 'wincmd w'
   endif
 
   let l:height = len(l:diags) - 1
