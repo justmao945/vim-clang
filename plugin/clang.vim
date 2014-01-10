@@ -88,13 +88,13 @@ endif
 " Init on c/c++ files
 au FileType c,cpp call <SID>ClangCompleteInit()
 "}}}
-"{{{ s:Debug
+"{{{ s:PDebug
 " Uses 'echom' to preserve @info when g:clang_debug is not 0.
 " Call ':messages' to see debug info
 " @head Prefix of debug info
 " @info Can be a string list, string, or dict
 " @lv   Debug level, write info only when lv < g:clang_debug, deault is 1
-func! s:Debug(head, info, ...)
+func! s:PDebug(head, info, ...)
   if a:0 > 0 && a:1 > 1
     let l:lv = a:1
   else
@@ -105,38 +105,21 @@ func! s:Debug(head, info, ...)
   endif
 endf
 "}}}
-"{{{ s:Error
+"{{{ s:PError
 " Uses 'echoe' to preserve @err
 " Call ':messages' to see error messages
 " @head Prefix of error message
 " @err Can be a string list, string, or dict
-func! s:Error(head, err)
+func! s:PError(head, err)
   echoe printf("Clang: error: %s >>> %s", string(a:head), string(a:err))
 endf
 "}}}
-"{{{ s:Log
+"{{{ s:PLog
 " Uses 'echom' to preserve @info.
 " @head Prefix of log info
 " @info Can be a string list, string, or dict
-func! s:Log(head, info)
+func! s:PLog(head, info)
   echom printf("Clang: log: %s >>> %s", string(a:head), string(a:info))
-endf
-"}}}
-""{{{ s:CloseDiagnosticsWindow
-" Close diagnostics and preview window
-"
-" Tab variable
-"   t:clang_diags_winnr   <= use and clear
-func! s:CloseDiagnosticsWindow()
-  if exists('t:clang_diags_winnr') && t:clang_diags_winnr != -1
-    call s:Debug("s:CloseDiagnosticsWindow", t:clang_diags_winnr)
-    let l:cwn = bufwinnr(bufnr('%'))
-    exe t:clang_diags_winnr . 'wincmd w'
-    hide
-    exe l:cwn . 'wincmd w'
-    let t:clang_diags_winnr = -1  " IMPORTANT, clear the result
-  endif
-  pclose
 endf
 "}}}
 " {{{ s:Complete[Dot|Arrow|Colon]
@@ -183,7 +166,7 @@ endf
 " @return a list of read files
 func! s:DeleteAfterReadTmps(tmps)
   if type(a:tmps) != type([])
-    call s:Error("s:DeleteAfterReadTmps", "Invalid arg: ". string(a:tmps))
+    call s:PError("s:DeleteAfterReadTmps", "Invalid arg: ". string(a:tmps))
   endif
   let l:res = []
   let l:i = 0
@@ -216,9 +199,9 @@ endf
 " @return List of dirs: ['path1', 'path2', ...]
 func! s:DiscoverIncludeDirs(clang, options)
   let l:command = printf('echo | %s -fsyntax-only -v %s -', a:clang, a:options)
-  call s:Debug("s:DiscoverIncludeDirs::cmd", l:command, 2)
+  call s:PDebug("s:DiscoverIncludeDirs::cmd", l:command, 2)
   let l:clang_output = split(system(l:command), "\n")
-  call s:Debug("s:DiscoverIncludeDirs::raw", l:clang_output, 2)
+  call s:PDebug("s:DiscoverIncludeDirs::raw", l:clang_output, 2)
   
   let l:i = 0
   let l:hit = 0
@@ -240,8 +223,109 @@ func! s:DiscoverIncludeDirs(clang, options)
       break
     endif
   endfor
-  call s:Debug("s:DiscoverIncludeDirs::parsed", l:clang_output, 2)
+  call s:PDebug("s:DiscoverIncludeDirs::parsed", l:clang_output, 2)
   return l:res
+endf
+"}}}
+""{{{ s:DiagnosticsWindowClose
+" Close diagnostics and preview window
+" Tab variable
+"   t:clang_diags_winnr   <= use and clear
+func! s:DiagnosticsWindowClose()
+  if exists('t:clang_diags_winnr') && t:clang_diags_winnr != -1
+    call s:PDebug("s:DiagnosticsWindowClose", t:clang_diags_winnr)
+    let l:cwn = bufwinnr(bufnr('%'))
+    exe t:clang_diags_winnr . 'wincmd w'
+    hide
+    let t:clang_diags_winnr = -1  " IMPORTANT, clear the window number
+    exe l:cwn . 'wincmd w'
+  endif
+  pclose
+  return -1
+endf
+"}}}
+"{{{ s:DiagnosticsWindowOpen
+" Split a window to show clang diagnostics. If there's no diagnostics, close
+" the split window.
+" Global variable:
+"   g:clang_diagsopt
+"   g:clang_statusline
+" Tab variable
+"   t:clang_diags_winnr   <= save
+"   t:clang_diags_bufnr   <= internal save and use
+" @diags A list of lines from clang diagnostics, or a diagnostics file name.
+" @return -1 or window number
+func! s:DiagnosticsWindowOpen(diags)
+  let l:diags = a:diags
+  if type(l:diags) == type('') " diagnostics file name
+    let l:diags = readfile(l:diags)
+  elseif type(l:diags) != type([])
+    call s:PError("s:DiagnosticsWindowOpen", 'Invalid arg ' . string(l:diags))
+    return -1
+  endif
+  
+  let l:i = stridx(g:clang_diagsopt, ':')
+  let l:mode      = g:clang_diagsopt[0 : l:i-1]
+  let l:maxheight = g:clang_diagsopt[l:i+1 : -1]
+
+  " Here uses t:clang_diags_bufnr to keep only one window in a *tab*
+  if !exists('t:clang_diags_bufnr') || !bufexists(t:clang_diags_bufnr)
+    let t:clang_diags_bufnr = bufnr('ClangDiagnostics@' . last_buffer_nr(), 1)
+  endif
+  let l:cbuf = bufnr('%')
+
+  let t:clang_diags_winnr = bufwinnr(t:clang_diags_bufnr)
+  if t:clang_diags_winnr == -1
+    if ! empty(l:diags)  " split a new window
+      call s:PDebug("s:DiagnosticsWindowOpen", "split window")
+      exe 'silent keepalt keepjumps keepmarks ' .l:mode. ' sbuffer ' . t:clang_diags_bufnr
+      " IMPORTANT!! update winnr
+      let t:clang_diags_winnr = bufwinnr(t:clang_diags_bufnr)
+    else
+      return -1
+    endif
+  else if empty(l:diags)
+    return s:DiagnosticsWindowClose()
+  endif
+
+  let l:height = len(l:diags) - 1
+  if l:maxheight < l:height
+    let l:height = l:maxheight
+  endif
+
+  " the last line will be showed in status line as file name
+  exe 'silent resize '. l:height
+
+  setl modifiable
+  silent 1,$ delete _   " clear buffer before write
+  
+  for l:line in l:diags
+    call append(line('$')-1, l:line)
+  endfor
+
+  silent 1 " goto the 1st line
+    
+  setl buftype=nofile bufhidden=hide
+  setl noswapfile nobuflisted nowrap nonumber nospell nomodifiable
+  setl cursorline
+  setl colorcolumn=-1
+  
+  syn match ClangSynDiagsError    display 'error:'
+  syn match ClangSynDiagsWarning  display 'warning:'
+  syn match ClangSynDiagsNote     display 'note:'
+  syn match ClangSynDiagsPosition display '^\s*[~^ ]\+$'
+  
+  hi ClangSynDiagsError           guifg=Red     ctermfg=9
+  hi ClangSynDiagsWarning         guifg=Magenta ctermfg=13
+  hi ClangSynDiagsNote            guifg=Gray    ctermfg=8
+  hi ClangSynDiagsPosition        guifg=Green   ctermfg=10
+
+  " change file name to the last line of diags and goto line 1
+  exe printf('setl statusline='.g:clang_statusline, escape(l:diags[-1], ' \'))
+
+  " back to current window
+  exe bufwinnr(l:cbuf) . 'wincmd w'
+  return t:clang_diags_winnr
 endf
 "}}}
 "{{{  s:GenPCH
@@ -265,13 +349,13 @@ func! s:GenPCH(clang, options, header)
   endif
   
   let l:command = printf('%s -cc1 %s -emit-pch -o %s.pch %s', a:clang, a:options, l:header, l:header)
-  call s:Debug("s:GenPCH::cmd", l:command, 2)
+  call s:PDebug("s:GenPCH::cmd", l:command, 2)
   let l:clang_output = system(l:command)
 
   if v:shell_error
-    call s:Error("s:GenPCH", {'exit': v:shell_error, 'cmd': l:command, 'out': l:clang_output })
+    call s:PError("s:GenPCH", {'exit': v:shell_error, 'cmd': l:command, 'out': l:clang_output })
   else
-    call s:Log("s:GenPCH", 'Clang creates PCH flie ' . l:header . '.pch successfully!')
+    call s:PLog("s:GenPCH", 'Clang creates PCH flie ' . l:header . '.pch successfully!')
   endif
   return l:clang_output
 endf
@@ -323,7 +407,7 @@ func! s:ParseCompletePoint()
         let l:base = l:line[l:col : l:start-1]
         let l:start = l:col " reset l:start in case 1
       else
-        call s:Error("s:ParseCompletePoint", 'Can not complete after an invalid identifier <'
+        call s:PError("s:ParseCompletePoint", 'Can not complete after an invalid identifier <'
             \. l:line[l:col : l:start-1] . '>')
         return [-3, l:base]
       endif
@@ -346,7 +430,7 @@ func! s:ParseCompletePoint()
     if ! l:ismber && empty(l:base)
       return [-3, l:base]
     endif
-    call s:Debug("s:ParseCompletePoint", printf("start: %s, base: %s", l:start, l:base))
+    call s:PDebug("s:ParseCompletePoint", printf("start: %s, base: %s", l:start, l:base))
     return [l:start, l:base]
 endf
 " }}}
@@ -393,97 +477,6 @@ func! s:ParseCompletionResult(output, base)
   return l:res
 endf
 " }}}
-"{{{ s:ShowDiagnostics
-" Split a window to show clang diagnostics. If there's no diagnostics, close
-" the split window.
-" Global variable:
-"   g:clang_diagsopt
-"   g:clang_statusline
-" Tab variable
-"   t:clang_diags_winnr   <= save
-"   t:clang_diags_bufnr   <= internal save and use
-" @diags A list of lines from clang diagnostics, or a diagnostics file name.
-" @return -1 or window number
-func! s:ShowDiagnostics(diags)
-  let l:diags = a:diags
-  if type(l:diags) == type('') " diagnostics file name
-    let l:diags = readfile(l:diags)
-  elseif type(l:diags) != type([])
-    call s:Error("s:ShowDiagnostics", 'Invalid arg ' . string(l:diags))
-    return -1
-  endif
-  
-  let l:i = stridx(g:clang_diagsopt, ':')
-  let l:mode      = g:clang_diagsopt[0 : l:i-1]
-  let l:maxheight = g:clang_diagsopt[l:i+1 : -1]
-
-  " Here uses t:clang_diags_bufnr to keep only one window in a *tab*
-  if !exists('t:clang_diags_bufnr') || !bufexists(t:clang_diags_bufnr)
-    let t:clang_diags_bufnr = bufnr('ClangDiagnostics@' . last_buffer_nr(), 1)
-  endif
-  let l:diags_bufnr = t:clang_diags_bufnr
-  let l:cbuf = bufnr('%')
-
-  let l:diags_winnr = bufwinnr(l:diags_bufnr)
-  if l:diags_winnr == -1
-    if !empty(l:diags)  " split a new window
-      call s:Debug("s:ShowDiagnostics", "split diagnostics window")
-      exe 'silent keepalt keepjumps keepmarks ' .l:mode. ' sbuffer ' .l:diags_bufnr
-    else
-      return -1
-    endif
-  else " goto diag window  no matter diagnostics is empty or not
-    exe l:diags_winnr . 'wincmd w'
-    if empty(l:diags) " hide the diag window then restore cursor and !!RETURN!!
-      call s:Debug("s:ShowDiagnostics", "hide diagnostics window")
-      hide
-      " back to current window
-      exe bufwinnr(l:cbuf) . 'wincmd w'
-      return l:diags_winnr
-    endif
-  endif
-
-  let l:height = len(l:diags) - 1
-  if l:maxheight < l:height
-    let l:height = l:maxheight
-  endif
-
-  " the last line will be showed in status line as file name
-  exe 'silent resize '. l:height
-
-  setl modifiable
-  silent 1,$ delete _   " clear buffer before write
-  
-  for l:line in l:diags
-    call append(line('$')-1, l:line)
-  endfor
-
-  silent 1 " goto the 1st line
-    
-  setl buftype=nofile bufhidden=hide
-  setl noswapfile nobuflisted nowrap nonumber nospell nomodifiable
-  setl cursorline
-  setl colorcolumn=-1
-  
-  syn match ClangSynDiagsError    display 'error:'
-  syn match ClangSynDiagsWarning  display 'warning:'
-  syn match ClangSynDiagsNote     display 'note:'
-  syn match ClangSynDiagsPosition display '^\s*[~^ ]\+$'
-  
-  hi ClangSynDiagsError           guifg=Red     ctermfg=9
-  hi ClangSynDiagsWarning         guifg=Magenta ctermfg=13
-  hi ClangSynDiagsNote            guifg=Gray    ctermfg=8
-  hi ClangSynDiagsPosition        guifg=Green   ctermfg=10
-
-  " change file name to the last line of diags and goto line 1
-  exe printf('setl statusline='.g:clang_statusline, escape(l:diags[-1], ' \'))
-
-  " back to current window
-  exe bufwinnr(l:cbuf) . 'wincmd w'
-  let t:clang_diags_winnr = bufwinnr(l:diags_bufnr)
-  return t:clang_diags_winnr
-endf
-"}}}
 "{{{ s:ShrinkPrevieWindow
 " Shrink preview window to fit lines.
 " Assume cursor is in the editing window, and preview window is above of it.
@@ -567,7 +560,7 @@ func! s:ClangCompleteInit()
   com! -nargs=* ClangGenPCHFromFile call <SID>GenPCH(g:clang_exec, b:clang_options_noPCH, <f-args>)
   
   " Create close diag window command
-  com! ClangClosePreviewDiagWindow  call <SID>CloseDiagnosticsWindow()
+  com! ClangClosePreviewDiagWindow  call <SID>DiagnosticsWindowClose()
 
   " try to find PCH files in clang_root and clang_root/include
   " Or add `-include-pch /path/to/x.h.pch` into the root file .clang manully
@@ -608,7 +601,7 @@ func! s:ClangCompleteInit()
   endif
 
   " Close diagnostics window when leave/enter old/new buffer window
-  au BufWinLeave,BufWinEnter <buffer> call <SID>CloseDiagnosticsWindow()
+  au BufWinLeave,BufWinEnter <buffer> call <SID>DiagnosticsWindowClose()
 endf
 "}}}
 "{{{ s:ClangExecute
@@ -645,8 +638,8 @@ func! s:ClangExecute(root, clang_options, line, col)
     let b:clang_state['state'] = 'ready'
     call system(l:command)
     let l:res = s:DeleteAfterReadTmps(l:tmps)
-    call s:Debug("s:ClangExecute::stdout", l:res[0], 2)
-    call s:Debug("s:ClangExecute::stderr", l:res[1], 2)
+    call s:PDebug("s:ClangExecute::stdout", l:res[0], 2)
+    call s:PDebug("s:ClangExecute::stderr", l:res[1], 2)
   else
     " Please note that '--remote-expr' executes expressions in server, but
     " '--remote-send' only sends keys, which is same as type keys in server...
@@ -677,8 +670,8 @@ func! ClangExecuteDone(tmp1, tmp2)
   let b:clang_state['state'] = 'sync'
   let b:clang_state['stdout'] = l:res[0]
   let b:clang_state['stderr'] = l:res[1]
-  call s:Debug("ClangExecuteDone::stdout", l:res[0], 2)
-  call s:Debug("ClangExecuteDone::stderr", l:res[1], 2)
+  call s:PDebug("ClangExecuteDone::stdout", l:res[0], 2)
+  call s:PDebug("ClangExecuteDone::stderr", l:res[1], 2)
   call feedkeys("\<Esc>a")
   " As the default action of <C-x><C-o> causes a 'pattern not found'
   " when the result is empty, which break our input, that's really painful...
@@ -710,7 +703,7 @@ endf
 "    }
 func! ClangComplete(findstart, base)
   if a:findstart
-    call s:Debug("ClangComplete", "phase 1")
+    call s:PDebug("ClangComplete", "phase 1")
     if !exists('b:clang_state')
       let b:clang_state = { 'state': 'ready', 'stdout': [], 'stderr': [] }
     endif
@@ -726,7 +719,7 @@ func! ClangComplete(findstart, base)
     let l:line    = line('.')
     let l:col     = l:start + 1
     let l:getline = getline('.')[0 : l:col-2]
-    call s:Debug("ClangComplete", printf("line: %s, col: %s, getline: %s", l:line, l:col, l:getline))
+    call s:PDebug("ClangComplete", printf("line: %s, col: %s, getline: %s", l:line, l:col, l:getline))
     
     " Cache parsed result into b:clang_cache
     " Reparse source file when:
@@ -744,7 +737,7 @@ func! ClangComplete(findstart, base)
           \ || ! empty(b:clang_cache['diagnostics'])
           \ || ! empty(b:clang_state['stderr'])
       let b:clang_cache = {'col': l:col, 'line': l:line, 'getline': l:getline}
-      call s:Debug("ClangComplete::state", b:clang_state['state'])
+      call s:PDebug("ClangComplete::state", b:clang_state['state'])
       " update state machine
       if b:clang_state['state'] == 'ready'
         let b:clang_state['state'] = 'busy'
@@ -763,10 +756,10 @@ func! ClangComplete(findstart, base)
     " update completions by new l:base
     let b:clang_cache['completions'] = s:ParseCompletionResult(b:clang_state['stdout'], l:base)
     " call to show diagnostics
-    call s:ShowDiagnostics(b:clang_cache['diagnostics'])
+    call s:DiagnosticsWindowOpen(b:clang_cache['diagnostics'])
     return l:start
   else
-    call s:Debug("ClangComplete", "phase 2")
+    call s:PDebug("ClangComplete", "phase 2")
     " Simulate CompleteDone event, see ClangCompleteInit().
     " b:clang_isCompleteDone_X is valid only when CompleteDone event is not available.
     let b:clang_isCompleteDone_0 = 1
