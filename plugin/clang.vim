@@ -284,7 +284,7 @@ func! s:DiagnosticsWindowOpen(diags)
     else
       return -1
     endif
-  else if empty(l:diags)
+  elseif empty(l:diags)
     return s:DiagnosticsWindowClose()
   endif
 
@@ -587,7 +587,7 @@ func! s:ClangCompleteInit()
 
   " CompleteDone event is available since version 7.3.598
   if exists("##CompleteDone")
-    au CompleteDone <buffer> call <SID>Debug("##CompleteDone", "triggered")
+    au CompleteDone <buffer> call <SID>PDebug("##CompleteDone", "triggered")
     " Automatically resize preview window after completion.
     " Default assume preview window is above of the editing window.
     au CompleteDone <buffer> call <SID>ShrinkPrevieWindow()
