@@ -95,7 +95,7 @@ au FileType c,cpp call <SID>ClangCompleteInit()
 " @info Can be a string list, string, or dict
 " @lv   Debug level, write info only when lv < g:clang_debug, deault is 1
 func! s:Debug(head, info, ...)
-  if a:0 > 1 && a:1 > 1
+  if a:0 > 0 && a:1 > 1
     let l:lv = a:1
   else
     let l:lv = 1
