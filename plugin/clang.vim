@@ -320,6 +320,12 @@ func! s:DiagnosticsWindowOpen(diags)
   setl cursorline
   setl colorcolumn=-1
   
+  " Don't use indentLine in the diagnostics window
+  " See https://github.com/Yggdroot/indentLine.git
+  if exists('b:indentLine_enabled') && b:indentLine_enabled
+    IndentLinesToggle
+  endif
+
   syn match ClangSynDiagsError    display 'error:'
   syn match ClangSynDiagsWarning  display 'warning:'
   syn match ClangSynDiagsNote     display 'note:'
