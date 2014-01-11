@@ -41,7 +41,6 @@ So that the source file should uses #include "yacl/xxx.h" to include files.
 
 ==============================================================================
 VARIABLES                                       *clang-variables*
-
 g:clang_auto                            *g:clang_auto*
         If equals to 1, automatically complete after ->, ., ::
     Default: >
@@ -106,6 +105,7 @@ g:clang_diagsopt                        *g:clang_diagsopt*
 <
 g:clang_pwheight                        *g:clang_pwheight*
         Maximum height of completion preview window if has it.
+        A local version of |previewheight| that only affect in current view.
     Default: >
         let g:clang_pwheight = 4
 <
@@ -152,7 +152,7 @@ ClangClosePreviewDiagWindow             *ClangClosePreviewDiagWindow*
 FAQ                                              *clang-faq*
 
 Q: How to open preview window ?
-A: Should add 'set completeopt=longest,menuone,preview' to $HOME/.vimrc .
+A: Should add 'au FileType cpp set completeopt+=preview' to $HOME/.vimrc .
 
 Q: How to open diagnostics window ?
 A: Diagnostics window will be opened automatically when some errors occured

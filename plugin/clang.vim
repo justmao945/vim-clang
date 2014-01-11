@@ -240,7 +240,9 @@ func! s:DiagnosticsWindowClose()
     let t:clang_diags_winnr = -1  " IMPORTANT, clear the window number
     exe l:cwn . 'wincmd w'
   endif
-  pclose
+  if s:HasPreviewAbove()
+    pclose " close preview window, too
+  endif
   return -1
 endf
 "}}}
@@ -301,14 +303,20 @@ func! s:DiagnosticsWindowOpen(diags)
   setl modifiable
   silent 1,$ delete _   " clear buffer before write
   
+  let l:diags_statics = ''
+  if empty(l:diags[-1]) || l:diags[-1] =~ '^[0-9]\+\serror\|warn\|note'
+    let l:diags_statics = l:diags[-1]
+    let l:diags = l:diags[0: -2]
+  endif
   for l:line in l:diags
     call append(line('$')-1, l:line)
   endfor
+  $delete _ " the last empty line
 
   silent 1 " goto the 1st line
     
   setl buftype=nofile bufhidden=hide
-  setl noswapfile nobuflisted nowrap nonumber nospell nomodifiable
+  setl noswapfile nobuflisted nowrap nonumber nospell nomodifiable winfixheight winfixwidth
   setl cursorline
   setl colorcolumn=-1
   
@@ -323,7 +331,7 @@ func! s:DiagnosticsWindowOpen(diags)
   hi ClangSynDiagsPosition        guifg=Green   ctermfg=10
 
   " change file name to the last line of diags and goto line 1
-  exe printf('setl statusline='.g:clang_statusline, escape(l:diags[-1], ' \'))
+  exe printf('setl statusline='.g:clang_statusline, escape(l:diags_statics, ' \'))
 
   " back to current window
   exe bufwinnr(l:cbuf) . 'wincmd w'
@@ -370,7 +378,7 @@ func! s:HasPreviewAbove()
   let l:cbuf = bufnr('%')
   let l:has = 0
   wincmd k  " goto above
-  if &previewwindow
+  if &completeopt =~ 'preview' && &previewwindow
     let l:has = 1
   endif
   exe bufwinnr(l:cbuf) . 'wincmd w'
@@ -472,10 +480,6 @@ func! s:ParseCompletionResult(output, base)
     endif
   endfor
 
-  if l:has_preview && ! s:HasPreviewAbove()
-    pclose " close preview window before completion
-  endif
-  
   return l:res
 endf
 " }}}
@@ -496,7 +500,13 @@ func! s:ShrinkPrevieWindow()
 
   wincmd k " go to above view
   if( &previewwindow )
+    " enhence the preview window
     exe 'resize ' . min([(line('$') - 1), g:clang_pwheight])
+    if empty(getline('$')) " delete the last empty line
+      setl modifiable
+      $delete _
+      setl nomodifiable
+    endif
     if l:cft !=# &filetype
       exe 'set filetype=' . l:cft
       setl nobuflisted
@@ -706,6 +716,10 @@ endf
 func! ClangComplete(findstart, base)
   if a:findstart
     call s:PDebug("ClangComplete", "phase 1")
+    " close preview window not owned by this view before completion
+    if ! s:HasPreviewAbove()
+      pclose
+    endif
     if !exists('b:clang_state')
       let b:clang_state = { 'state': 'ready', 'stdout': [], 'stderr': [] }
     endif
@@ -757,6 +771,10 @@ func! ClangComplete(findstart, base)
     endif
     " update completions by new l:base
     let b:clang_cache['completions'] = s:ParseCompletionResult(b:clang_state['stdout'], l:base)
+    " close preview window if empty
+    if empty(b:clang_cache['completions']) && s:HasPreviewAbove()
+      pclose
+    endif
     " call to show diagnostics
     call s:DiagnosticsWindowOpen(b:clang_cache['diagnostics'])
     return l:start
@@ -769,6 +787,7 @@ func! ClangComplete(findstart, base)
       return b:clang_cache['completions']
     else
       return []
+    endif
   endif
 endf
 "}}}
