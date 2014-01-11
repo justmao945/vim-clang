@@ -2,6 +2,19 @@ Description
 ---------------
 Use of clang to parse and complete C/C++ source files.
 
+
+MTSGXX
+---------------
+
+![C source](http://justmao945.github.io/static/vim-clang/2014-01-12-async.gif)
+
+
+Installation
+-------------
+* Put the file `plugin/clang.vim` into `~/.vim/plugin` is OK.
+* [pathogen.vim][4] `cd ~/.vim/bundle; git clone https://github.com/justmao945/vim-clang.git` is recommended.
+
+
 Why
 ---------------
 I was a user of clang\_compelete and it's really a good job, but someday I found that
@@ -61,11 +74,6 @@ find that's too 'slow' to wait the completion...
   can start Gvim to work as a server or you must add '--servername XXX' to force to start
   a vim server. More to see ':h clientserver'.
 
-Installation
--------------
-* Put the file `plugin/clang.vim` into `~/.vim/plugin` is OK.
-* [pathogen.vim][4] `cd ~/.vim/bundle; git clone https://github.com/justmao945/vim-clang.git` is recommended.
-
 
 Options and Commands
 --------------------
@@ -74,36 +82,6 @@ Options and Commands
 OS requirement
 --------------------
 Now only tested on Linux (Ubuntu/Debian)
-
-
-Screenshots
--------------
-
-#### Complete C source
-###### Start, popup completions and open preview window
-![C source](http://justmao945.github.io/static/vim-clang/2013-02-06-142049_1278x776_scrot_zps2982ca2a.png)
-###### Done, open diagnostics window
-![C source done](http://justmao945.github.io/static/vim-clang/2013-02-06-142131_1278x774_scrot_zps7d9633c5.png)
-
-#### Complete C++ source in another tabpage.
-###### Start, popup completions and open preview window
-![C++ source](http://justmao945.github.io/static/vim-clang/2013-02-06-142349_1276x774_scrot_zps95dfe9cb.png)
-###### Done, open diagnostics window
-![C++ source done](http://justmao945.github.io/static/vim-clang/2013-02-06-142402_1278x773_scrot_zps05796743.png)
-
-#### Generate PCH
-###### Start to generate PCH
-![Generate PCH](http://justmao945.github.io/static/vim-clang/2013-02-06-142540_593x636_scrot_zpsd2510a71.png)
-###### Generate PCH successfully
-![Generate PCH successfully](http://justmao945.github.io/static/vim-clang/2013-02-06-142552_594x637_scrot_zps3d337ed2.png)
-
-#### Usage of .clang
-###### .clang is located in the project **root**
-![.clang](http://justmao945.github.io/static/vim-clang/2013-02-06-143601_746x153_scrot_zpsb3b4e275.png)
-###### Start, popup completions and open preview window
-![.clang C source](http://justmao945.github.io/static/vim-clang/2013-02-06-143705_591x636_scrot_zpsac9083d6.png)
-###### Done, open diagnostics window
-![.clang C source done](http://justmao945.github.io/static/vim-clang/2013-02-06-143716_593x635_scrot_zps260a9d03.png)
 
 
 [1]: https://github.com/Rip-Rip/clang_complete
