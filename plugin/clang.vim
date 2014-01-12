@@ -95,11 +95,7 @@ au FileType c,cpp call <SID>ClangCompleteInit()
 " @info Can be a string list, string, or dict
 " @lv   Debug level, write info only when lv < g:clang_debug, deault is 1
 func! s:PDebug(head, info, ...)
-  if a:0 > 0 && a:1 > 1
-    let l:lv = a:1
-  else
-    let l:lv = 1
-  endif
+  let l:lv = a:0 > 0 && a:1 > 1 ? a:1 : 1
   if l:lv <= g:clang_debug
     echom printf("Clang: debug: %s >>> %s", string(a:head), string(a:info))
   endif
@@ -126,14 +122,14 @@ endf
 " Tigger a:cmd when cursor is after . -> and ::
 
 func! s:ShouldComplete()
-  if getline('.') =~ '#\s*\(include\|import\)' || getline('.')[col('.') - 2] == "'"
+  if getline('.') =~# '#\s*\(include\|import\)' || getline('.')[col('.') - 2] == "'"
     return 0
   endif
   if col('.') == 1
     return 1
   endif
   for id in synstack(line('.'), col('.') - 1)
-    if synIDattr(id, 'name') =~ 'Comment\|String\|Number\|Char\|Label\|Special'
+    if synIDattr(id, 'name') =~# 'Comment\|String\|Number\|Char\|Label\|Special'
       return 0
     endif
   endfor
@@ -309,23 +305,21 @@ func! s:DiagnosticsWindowOpen(diags)
     exe l:winnr . 'wincmd w'
   endif
 
-  let l:height = len(l:diags) - 1
-  if l:maxheight < l:height
-    let l:height = l:maxheight
-  endif
-
   " the last line will be showed in status line as file name
-  exe 'silent resize '. l:height
-
-  setl modifiable
-  " clear buffer before write
-  silent 1,$ delete _
-  
   let l:diags_statics = ''
   if empty(l:diags[-1]) || l:diags[-1] =~ '^[0-9]\+\serror\|warn\|note'
     let l:diags_statics = l:diags[-1]
     let l:diags = l:diags[0: -2]
   endif
+
+  let l:height = min([len(l:diags), l:maxheight])
+  exe 'silent resize '. l:height
+
+  setl modifiable
+  " clear buffer before write
+  silent 1,$ delete _
+
+  " add diagnostics
   for l:line in l:diags
     call append(line('$')-1, l:line)
   endfor
@@ -504,7 +498,7 @@ func! s:ParseCompletionResult(output, base)
     if empty(l:res) || l:res[-1]['word'] !=# l:word
       call add(l:res, {
           \ 'word': l:word,
-          \ 'menu': l:has_preview ? '' : l:proto,
+          \ 'menu': l:has_preview ? '' : l:word ==# l:proto ? '' : l:proto,
           \ 'info': l:proto,
           \ 'dup' : 1 })
     elseif !empty(l:res)
@@ -523,7 +517,7 @@ endf
 "   g:clang_pwheight
 "   g:clang_statusline
 func! s:ShrinkPrevieWindow()
-  if &completeopt !~# 'preview'
+  if &completeopt !~ 'preview'
     return
   endif
 
@@ -543,7 +537,7 @@ func! s:ShrinkPrevieWindow()
     let l:height = min([line('$'), g:clang_pwheight])
     exe 'resize ' . l:height
     call s:PDebug("s:ShrinkPrevieWindow::height", l:height)
-    if l:cft !=# &filetype
+    if l:cft != &filetype
       exe 'set filetype=' . l:cft
       setl nobuflisted
       exe printf('setl statusline='.g:clang_statusline, 'Prototypes')
@@ -615,7 +609,7 @@ func! s:ClangCompleteInit()
 
   " try to find PCH files in clang_root and clang_root/include
   " Or add `-include-pch /path/to/x.h.pch` into the root file .clang manully
-  if &filetype ==# 'cpp' && b:clang_options !~# '-include-pch'
+  if &filetype == 'cpp' && b:clang_options !~# '-include-pch'
     let l:cwd = fnameescape(getcwd())
     exe 'lcd ' . b:clang_root
     let l:afx = findfile(g:clang_stdafx_h, '.;./include') . '.pch'
@@ -749,11 +743,11 @@ endf
 "      'stderr': [],
 "    }
 "    b:clang_cache => {
-"      'line'    : 0,  // previous completion line number
-"      'col'     : 0,  // previous completion column number
-"      'getline' : ''  // previous completion line content
-"      'completions': [] // parsed completion result
-"      'diagnostics': [] // diagnostics info
+"      'line'    : 0,   // previous completion line number
+"      'col'     : 0,   // previous completion column number
+"      'getline' : '',  // previous completion line content
+"      'completions': [], // parsed completion result
+"      'diagnostics': [], // diagnostics info
 "    }
 func! ClangComplete(findstart, base)
   if a:findstart
@@ -816,6 +810,7 @@ func! ClangComplete(findstart, base)
       " start async mode, need to wait the call back
       return -3
     endif
+    
     " update completions by new l:base
     let b:clang_cache['completions'] = s:ParseCompletionResult(b:clang_state['stdout'], l:base)
     " close preview window if empty
