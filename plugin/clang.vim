@@ -164,7 +164,7 @@ endf
 " @tmps Tmp files name list
 " @return a list of read files
 func! s:DeleteAfterReadTmps(tmps)
-  call s:PDebug("s:DeleteAfterReadTmps", tmps)
+  call s:PDebug("s:DeleteAfterReadTmps", a:tmps)
   if type(a:tmps) != type([])
     call s:PError("s:DeleteAfterReadTmps", "Invalid arg: ". string(a:tmps))
   endif
