@@ -222,7 +222,9 @@ func! s:DiscoverIncludeDirs(clang, options)
   let l:res = []
   for l:line in l:clang_output
     if l:line[0] == ' '
-      call add(l:res, fnameescape(l:line[1:-1]))
+      " a dirty workaround for Mac OS X (see issue #5)
+      let l:path=substitute(l:line[1:-1], ' (framework directory)$', '', 'g')
+      call add(l:res, fnameescape(l:path))
     elseif l:line =~# '^End'
       break
     endif
