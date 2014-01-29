@@ -202,7 +202,7 @@ endf
 " @options Additional options passed to clang, e.g. -stdlib=libc++
 " @return List of dirs: ['path1', 'path2', ...]
 func! s:DiscoverIncludeDirs(clang, options)
-  let l:command = printf('echo | %s -fsyntax-only -v %s -', a:clang, a:options)
+  let l:command = printf('echo | %s -fsyntax-only -v %s - 2>&1', a:clang, a:options)
   call s:PDebug("s:DiscoverIncludeDirs::cmd", l:command, 2)
   let l:clang_output = split(system(l:command), "\n")
   call s:PDebug("s:DiscoverIncludeDirs::raw", l:clang_output, 2)
