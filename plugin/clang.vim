@@ -73,6 +73,10 @@ if !exists('g:clang_pwheight')
   let g:clang_pwheight = 4
 endif
 
+if !exists('g:clang_sh_exec')
+  let g:clang_sh_exec = '/bin/sh'
+endif
+
 if !exists('g:clang_statusline')
   let g:clang_statusline='%s\ \|\ %%l/\%%L\ \|\ %%p%%%%'
 endif
@@ -564,6 +568,10 @@ endf
 "     b:clang_options_noPCH  => same as b:clang_options except no pch options
 "     b:clang_root => project root to run clang
 func! s:ClangCompleteInit()
+  " Here require standard shell...
+  let l:sh = &shell
+  exe 'set shell='.g:clang_sh_exec
+
   let l:cwd = fnameescape(getcwd())
   let l:fwd = fnameescape(expand('%:p:h'))
   exe 'lcd ' . l:fwd
@@ -650,6 +658,9 @@ func! s:ClangCompleteInit()
   " still available.
   "  FIXME buffer unload or leave events may cause vim SEGV...
   au BufWinEnter <buffer> call <SID>DiagnosticsWindowClose(1,1)
+
+  " restore the shell
+  exe 'set shell='.l:sh
 endf
 "}}}
 "{{{ s:ClangExecute
@@ -750,6 +761,9 @@ endf
 "      'diagnostics': [], // diagnostics info
 "    }
 func! ClangComplete(findstart, base)
+  let l:sh = &shell
+  exe 'set shell='.g:clang_sh_exec
+
   if a:findstart
     call s:PDebug("ClangComplete", "phase 1")
     " close preview window not owned by this view before completion
@@ -831,6 +845,8 @@ func! ClangComplete(findstart, base)
       return []
     endif
   endif
+
+  exe 'set shell='.l:sh
 endf
 "}}}
 
