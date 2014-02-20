@@ -54,6 +54,7 @@ g:clang_c_options                       *g:clang_c_options*
 g:clang_c_completeopt                   g:clang_c_completeopt*
         Local |completeopt| version for C sources.
     Default: >
+        " No preview window for C
         let g:clang_c_completeopt = 'longest,menuone'
 <
 g:clang_cpp_options                     *g:clang_cpp_options*
@@ -67,6 +68,7 @@ g:clang_cpp_options                     *g:clang_cpp_options*
 g:clang_cpp_completeopt                 *g:clang_cpp_completeopt*
         Local |completeopt| version for C++ sources.
     Default: >
+        " Have preview window for C++ as its complex prototypes
         let g:clang_cpp_completeopt = 'longest,menuone,preview'
 <
 g:clang_dotfile                         *g:clang_dotfile*
@@ -76,6 +78,19 @@ g:clang_dotfile                         *g:clang_dotfile*
         Note: Relative include and library path is recommended.
     Default: >
         let g:clang_dotfile = '.clang'
+<
+g:clang_dotfile_overwrite               *g:clang_dotfile_overwrite*
+        Same as |g:clang_dotfile| but has higher priority than it.
+        Options in |g:clang_dotfile| will be append to discovered
+        options that from |g:clang_c_options|, |g:clang_cpp_options|
+        and |g:clang_include_sysheaders|. But if |g:clang_dotfile_overwrite|
+        is exist, plugin will not do the discovery anymore, only add
+        the minimum of options and append |g:clang_dotfile_overwrite|
+        to them to before calling clang.
+        Note: This is very useful if you are doing some cross-platform
+        projects, they may have different include directory and options.
+    Default: >
+        let g:clang_dotfile_overwrite = '.clang.ow'
 <
 g:clang_exec                            *g:clang_exec*
         Name or path of executable clang. Use this if clang has a
@@ -112,6 +127,12 @@ g:clang_diagsopt                        *g:clang_diagsopt*
 <
     Default: >
         let g:clang_diagsopt = 'rightbelow:6'
+<
+g:clang_include_sysheaders              *g:clang_include_sysheaders*
+        Discover default system C/C++ headers automatically.
+        Set 0 to disable it.
+    Default: >
+        let g:clang_include_sysheaders = 1
 <
 g:clang_pwheight                        *g:clang_pwheight*
         Maximum height of completion preview window if has it.
@@ -161,9 +182,6 @@ ClangClosePreviewDiagWindow             *ClangClosePreviewDiagWindow*
 ==============================================================================
 FAQ                                              *clang-faq*
 
-Q: How to open preview window ?
-A: Should add 'au FileType cpp set completeopt+=preview' to $HOME/.vimrc .
-
 Q: How to open diagnostics window ?
 A: Diagnostics window will be opened automatically when some errors occured
    in your source code, and dismissed when they are fixed or change buffers.
@@ -172,6 +190,8 @@ A: Diagnostics window will be opened automatically when some errors occured
 CHANGELOG                                        *clang-changelog*
 0.23
 * Add g:clang_c_completeopt and g:clang_cpp_completeopt
+* Add g:clang_include_sysheaders
+* Add g:clang_dotfile_overwrite
 
 0.22
 * Change g:clang_diagsopt

@@ -73,8 +73,16 @@ if !exists('g:clang_dotfile')
   let g:clang_dotfile = '.clang'
 endif
 
+if !exists('g:clang_dotfile_overwrite')
+  let g:clang_dotfile_overwrite = '.clang.ow'
+endif
+
 if !exists('g:clang_exec')
   let g:clang_exec = 'clang'
+endif
+
+if !exists('g:clang_include_sysheaders')
+  let g:clang_include_sysheaders = 1
 endif
 
 if !exists('g:clang_pwheight')
@@ -613,10 +621,17 @@ func! s:ClangCompleteInit()
   let l:cwd = fnameescape(getcwd())
   let l:fwd = fnameescape(expand('%:p:h'))
   exe 'lcd ' . l:fwd
-  let l:dotclang = findfile(g:clang_dotfile, '.;')
+  let l:dotclang    = findfile(g:clang_dotfile, '.;')
+  let l:dotclangow  = findfile(g:clang_dotfile_overwrite, '.;')
 
   " Firstly, add clang options for current buffer file
   let b:clang_options = ''
+
+  let l:is_ow = 0
+  if filereadable(l:dotclangow)
+    let l:is_ow = 1
+    let l:dotclang = l:dotclangow
+  endif
 
   " clang root(aka .clang located directory) for current buffer
   if filereadable(l:dotclang)
@@ -631,18 +646,26 @@ func! s:ClangCompleteInit()
   endif
   exe 'lcd '.l:cwd
 
-  " Secondly, add options defined by user
+  " Secondly, add options defined by user if is not ow
   if &filetype == 'c'
-    let b:clang_options .= ' -x c ' . g:clang_c_options
+    let b:clang_options .= ' -x c '
+    if ! l:is_ow
+      let b:clang_options .= g:clang_c_options
+    endif
   elseif &filetype == 'cpp'
-    let b:clang_options .= ' -x c++ ' . g:clang_cpp_options
+    let b:clang_options .= ' -x c++ '
+    if ! l:is_ow
+      let b:clang_options .= g:clang_cpp_options
+    endif
   endif
   
-  " add include directories
-  let l:incs = s:DiscoverIncludeDirs(g:clang_exec, b:clang_options)
-  for l:dir in l:incs
-    let b:clang_options .= ' -I' . l:dir
-  endfor
+  " add include directories if is enabled and not ow
+  if g:clang_include_sysheaders && ! l:is_ow
+    let l:incs = s:DiscoverIncludeDirs(g:clang_exec, b:clang_options)
+    for l:dir in l:incs
+      let b:clang_options .= ' -I' . l:dir
+    endfor
+  endif
   
   " backup options without PCH support
   let b:clang_options_noPCH = b:clang_options
@@ -732,6 +755,7 @@ func! s:ClangExecute(root, clang_options, line, col)
   let l:res = [[], []]
   if !exists('v:servername') || empty(v:servername)
     let b:clang_state['state'] = 'ready'
+    call s:PDebug("s:ClangExecute::cmd", l:command, 1)
     call system(l:command)
     let l:res = s:DeleteAfterReadTmps(l:tmps)
     call s:PDebug("s:ClangExecute::stdout", l:res[0], 2)
@@ -744,6 +768,7 @@ func! s:ClangExecute(root, clang_options, line, col)
     let l:vcmd = printf('%s -s --noplugin --servername %s --remote-expr "%s"',
                       \ g:clang_vim_exec, v:servername, l:keys)
     let l:command = '('.l:command.';'.l:vcmd.') &'
+    call s:PDebug("s:ClangExecute::cmd", l:command, 1)
     call system(l:command)
   endif
   exe 'lcd ' . l:cwd
