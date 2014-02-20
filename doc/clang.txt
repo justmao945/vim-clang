@@ -47,17 +47,27 @@ g:clang_auto                            *g:clang_auto*
         let g:clang_auto = 1
 <
 g:clang_c_options                       *g:clang_c_options*
-        Option added at the end of clang command for C sources.
+        Options added at the end of clang command for C sources.
     Default: >
         let g:clang_c_options = ''
 <
+g:clang_c_completeopt                   g:clang_c_completeopt*
+        Local |completeopt| version for C sources.
+    Default: >
+        let g:clang_c_completeopt = 'longest,menuone'
+<
 g:clang_cpp_options                     *g:clang_cpp_options*
-        Option added at the end of clang command for C++ sources.
+        Options added at the end of clang command for C++ sources.
     Default: >
         let g:clang_cpp_options = ''
 <
     To support c++0x features and use libcxx: >
         let g:clang_cpp_options = '-std=c++ -stdlib=libc++'
+<
+g:clang_cpp_completeopt                 *g:clang_cpp_completeopt*
+        Local |completeopt| version for C++ sources.
+    Default: >
+        let g:clang_cpp_completeopt = 'longest,menuone,preview'
 <
 g:clang_dotfile                         *g:clang_dotfile*
         Each project can have a dot file at his root, containing 
@@ -160,6 +170,9 @@ A: Diagnostics window will be opened automatically when some errors occured
 
 ==============================================================================
 CHANGELOG                                        *clang-changelog*
+0.23
+* Add g:clang_c_completeopt and g:clang_cpp_completeopt
+
 0.22
 * Change g:clang_diagsopt
 * Show diagnostics window before popup completion window
@@ -180,6 +193,7 @@ CREDITS                                          *clang-credits*
 
 Thanks to the following people for suggestions and patches:
 * RageCooky
+* wookayin
 * yuquan23459
 
 ==============================================================================

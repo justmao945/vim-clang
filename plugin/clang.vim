@@ -49,8 +49,16 @@ if !exists('g:clang_c_options')
   let g:clang_c_options = ''
 endif
 
+if !exists('g:clang_c_completeopt')
+  let g:clang_c_completeopt = 'longest,menuone'
+endif
+
 if !exists('g:clang_cpp_options')
   let g:clang_cpp_options = ''
+endif
+
+if !exists('g:clang_cpp_completeopt')
+  let g:clang_cpp_completeopt = 'longest,menuone,preview'
 endif
 
 if !exists('g:clang_debug')
@@ -395,6 +403,36 @@ func! s:GenPCH(clang, options, header)
   return l:clang_output
 endf
 "}}}
+" {{{ s:GlobalVarSet
+" Set global vim options for clang and return old values
+" @return old values
+func! s:GlobalVarSet()
+  let l:values = {
+      \ 'shell':        &shell,
+      \ 'completeopt':  &completeopt,
+  \ }
+  if !empty(g:clang_sh_exec)
+    exe 'set shell='.g:clang_sh_exec
+  endif
+  if &filetype == 'c' && !empty(g:clang_c_completeopt)
+    exe 'set completeopt='.g:clang_c_completeopt
+  elseif &filetype == 'cpp' && !empty(g:clang_cpp_completeopt)
+    exe 'set completeopt='.g:clang_cpp_completeopt
+  endif
+  return l:values
+endf
+" }}}
+" {{{ s:GlobalVarRestore
+" Restore global vim options
+func! s:GlobalVarRestore(values)
+  if type(a:values) != type({})
+    s:PError('GlobalVarRestore', 'invalid arg type')
+    return
+  endif
+  exe 'set shell='.a:values['shell']
+  exe 'set completeopt='.a:values['completeopt']
+endf
+" }}}
 " {{{ s:HasPreviewAbove
 " 
 " Detect above view is preview window or not.
@@ -568,9 +606,7 @@ endf
 "     b:clang_options_noPCH  => same as b:clang_options except no pch options
 "     b:clang_root => project root to run clang
 func! s:ClangCompleteInit()
-  " Here require standard shell...
-  let l:sh = &shell
-  exe 'set shell='.g:clang_sh_exec
+  let l:gvars = s:GlobalVarSet()
 
   let l:cwd = fnameescape(getcwd())
   let l:fwd = fnameescape(expand('%:p:h'))
@@ -659,8 +695,7 @@ func! s:ClangCompleteInit()
   "  FIXME buffer unload or leave events may cause vim SEGV...
   au BufWinEnter <buffer> call <SID>DiagnosticsWindowClose(1,1)
 
-  " restore the shell
-  exe 'set shell='.l:sh
+  call s:GlobalVarRestore(l:gvars)
 endf
 "}}}
 "{{{ s:ClangExecute
@@ -761,8 +796,7 @@ endf
 "      'diagnostics': [], // diagnostics info
 "    }
 func! ClangComplete(findstart, base)
-  let l:sh = &shell
-  exe 'set shell='.g:clang_sh_exec
+  let l:gvars = s:GlobalVarSet()
 
   if a:findstart
     call s:PDebug("ClangComplete", "phase 1")
@@ -846,7 +880,7 @@ func! ClangComplete(findstart, base)
     endif
   endif
 
-  exe 'set shell='.l:sh
+  call s:GlobalVarRestore(l:gvars)
 endf
 "}}}
 
