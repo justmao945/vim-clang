@@ -81,7 +81,7 @@ Options and Commands
 
 OS requirement
 --------------------
-Now only tested on Linux (Ubuntu/Debian)
+Now only tested on Linux (Ubuntu/Debian) and Mac OSX
 
 
 [1]: https://github.com/Rip-Rip/clang_complete
