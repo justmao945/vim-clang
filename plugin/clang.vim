@@ -84,7 +84,8 @@ if !exists('g:clang_pwheight')
 endif
 
 if !exists('g:clang_sh_exec')
-  let g:clang_sh_exec = '/bin/sh'
+  " TODO: Need bash or sh on Microsoft Windows, cmd.exe is not supported.
+  let g:clang_sh_exec = 'sh'
 endif
 
 if !exists('g:clang_statusline')
@@ -96,7 +97,11 @@ if !exists('g:clang_stdafx_h')
 endif
 
 if !exists('g:clang_vim_exec')
-  let g:clang_vim_exec = 'vim'
+  if has('mac')
+    let g:clang_vim_exec = 'mvim'
+  else
+    let g:clang_vim_exec = 'vim'
+  endif
 endif
 
 " Init on c/c++ files
