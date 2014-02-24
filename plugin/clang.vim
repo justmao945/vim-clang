@@ -616,6 +616,10 @@ endf
 "     b:clang_options_noPCH  => same as b:clang_options except no pch options
 "     b:clang_root => project root to run clang
 func! s:ClangCompleteInit()
+  " omnifunc may be overwritten by other actions.
+  setl completefunc=ClangComplete
+  setl omnifunc=ClangComplete
+
   if ! exists('b:clang_complete_inited')
     let b:clang_complete_inited = 1
   else
@@ -697,9 +701,6 @@ func! s:ClangCompleteInit()
     endif
     exe 'lcd '.l:cwd
   endif
-
-  setl completefunc=ClangComplete
-  setl omnifunc=ClangComplete
 
   if g:clang_auto   " Auto completion
     inoremap <expr> <buffer> . <SID>CompleteDot()
