@@ -880,7 +880,7 @@ func! ClangComplete(findstart, base)
       if b:clang_state['state'] == 'ready'
         let b:clang_state['state'] = 'busy'
         " buggy when update in the second phase ?
-        silent update
+        silent update!
         call s:ClangExecute(b:clang_root, b:clang_options, l:line, l:col)
       elseif b:clang_state['state'] == 'sync'
         let b:clang_state['state'] = 'ready'
