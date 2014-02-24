@@ -616,10 +616,6 @@ endf
 "     b:clang_options_noPCH  => same as b:clang_options except no pch options
 "     b:clang_root => project root to run clang
 func! s:ClangCompleteInit()
-  if &previewwindow
-    return
-  endif
-
   if ! exists('b:clang_complete_inited')
     let b:clang_complete_inited = 1
   else
@@ -833,6 +829,8 @@ endf
 "      'diagnostics': [], // diagnostics info
 "    }
 func! ClangComplete(findstart, base)
+  call s:PDebug("ClangComplete", "start")
+
   let l:gvars = s:GlobalVarSet()
 
   if a:findstart
