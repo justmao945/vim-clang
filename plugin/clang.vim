@@ -10,12 +10,6 @@
 "   2. Make sure `vim` is available in path if uses asynchronized mode(default)
 "     if g:clang_vim_exec is empty.
 "
-"   3. Set completeopt+=preview to show prototype in preview window.
-"      But there's no local completeopt, so we use BufEnter event.
-"      e.g. only for C++ sources but not for C, add
-"         au BufEnter *.cc,*.cpp,*.hh,*hpp set completeopt+=preview
-"         au BufEnter *.c,*.h set completeopt-=preview
-"      to .vimrc
 " TODO:
 "   1. Private members filter
 "   2. Remove OmniComplete .... Pattern Not Found error?...
@@ -49,8 +43,16 @@ if !exists('g:clang_c_options')
   let g:clang_c_options = ''
 endif
 
+if !exists('g:clang_c_completeopt')
+  let g:clang_c_completeopt = 'longest,menuone'
+endif
+
 if !exists('g:clang_cpp_options')
   let g:clang_cpp_options = ''
+endif
+
+if !exists('g:clang_cpp_completeopt')
+  let g:clang_cpp_completeopt = 'longest,menuone,preview'
 endif
 
 if !exists('g:clang_debug')
@@ -65,8 +67,16 @@ if !exists('g:clang_dotfile')
   let g:clang_dotfile = '.clang'
 endif
 
+if !exists('g:clang_dotfile_overwrite')
+  let g:clang_dotfile_overwrite = '.clang.ow'
+endif
+
 if !exists('g:clang_exec')
   let g:clang_exec = 'clang'
+endif
+
+if !exists('g:clang_include_sysheaders')
+  let g:clang_include_sysheaders = 1
 endif
 
 if !exists('g:clang_pwheight')
@@ -74,7 +84,8 @@ if !exists('g:clang_pwheight')
 endif
 
 if !exists('g:clang_sh_exec')
-  let g:clang_sh_exec = '/bin/sh'
+  " TODO: Need bash or sh on Microsoft Windows, cmd.exe is not supported.
+  let g:clang_sh_exec = 'sh'
 endif
 
 if !exists('g:clang_statusline')
@@ -86,7 +97,11 @@ if !exists('g:clang_stdafx_h')
 endif
 
 if !exists('g:clang_vim_exec')
-  let g:clang_vim_exec = 'vim'
+  if has('mac')
+    let g:clang_vim_exec = 'mvim'
+  else
+    let g:clang_vim_exec = 'vim'
+  endif
 endif
 
 " Init on c/c++ files
@@ -205,7 +220,7 @@ func! s:DiscoverIncludeDirs(clang, options)
   let l:command = printf('echo | %s -fsyntax-only -v %s - 2>&1', a:clang, a:options)
   call s:PDebug("s:DiscoverIncludeDirs::cmd", l:command, 2)
   let l:clang_output = split(system(l:command), "\n")
-  call s:PDebug("s:DiscoverIncludeDirs::raw", l:clang_output, 2)
+  call s:PDebug("s:DiscoverIncludeDirs::raw", l:clang_output, 3)
   
   let l:i = 0
   let l:hit = 0
@@ -224,12 +239,12 @@ func! s:DiscoverIncludeDirs(clang, options)
     if l:line[0] == ' '
       " a dirty workaround for Mac OS X (see issue #5)
       let l:path=substitute(l:line[1:-1], ' (framework directory)$', '', 'g')
-      call add(l:res, fnameescape(l:path))
+      call add(l:res, l:path)
     elseif l:line =~# '^End'
       break
     endif
   endfor
-  call s:PDebug("s:DiscoverIncludeDirs::parsed", l:clang_output, 2)
+  call s:PDebug("s:DiscoverIncludeDirs::parsed", l:res, 2)
   return l:res
 endf
 "}}}
@@ -377,15 +392,16 @@ endf
 " @return  Output of clang
 "
 func! s:GenPCH(clang, options, header)
-  let l:header = fnameescape(expand(a:header))
-  if l:header !~? '.h'
-    let cho = confirm('Not a C/C++ header: ' . l:header . "\n" .
+  if a:header !~? '.h'
+    let cho = confirm('Not a C/C++ header: ' . a:header . "\n" .
           \ 'Continue to generate PCH file ?',
           \ "&Yes\n&No", 2)
     if cho != 1 | return | endif
   endif
-  
-  let l:command = printf('%s -cc1 %s -emit-pch -o %s.pch %s', a:clang, a:options, l:header, l:header)
+ 
+  let l:header      = shellescape(a:header)
+  let l:header_pch  = shellescape(a:header . ".pch")
+  let l:command = printf('%s -cc1 %s -emit-pch -o %s %s', a:clang, a:options, l:header_pch, l:header)
   call s:PDebug("s:GenPCH::cmd", l:command, 2)
   let l:clang_output = system(l:command)
 
@@ -397,6 +413,36 @@ func! s:GenPCH(clang, options, header)
   return l:clang_output
 endf
 "}}}
+" {{{ s:GlobalVarSet
+" Set global vim options for clang and return old values
+" @return old values
+func! s:GlobalVarSet()
+  let l:values = {
+      \ 'shell':        &shell,
+      \ 'completeopt':  &completeopt,
+  \ }
+  if !empty(g:clang_sh_exec)
+    exe 'set shell='.g:clang_sh_exec
+  endif
+  if &filetype == 'c' && !empty(g:clang_c_completeopt)
+    exe 'set completeopt='.g:clang_c_completeopt
+  elseif &filetype == 'cpp' && !empty(g:clang_cpp_completeopt)
+    exe 'set completeopt='.g:clang_cpp_completeopt
+  endif
+  return l:values
+endf
+" }}}
+" {{{ s:GlobalVarRestore
+" Restore global vim options
+func! s:GlobalVarRestore(values)
+  if type(a:values) != type({})
+    s:PError('GlobalVarRestore', 'invalid arg type')
+    return
+  endif
+  exe 'set shell='.a:values['shell']
+  exe 'set completeopt='.a:values['completeopt']
+endf
+" }}}
 " {{{ s:HasPreviewAbove
 " 
 " Detect above view is preview window or not.
@@ -570,17 +616,33 @@ endf
 "     b:clang_options_noPCH  => same as b:clang_options except no pch options
 "     b:clang_root => project root to run clang
 func! s:ClangCompleteInit()
-  " Here require standard shell...
-  let l:sh = &shell
-  exe 'set shell='.g:clang_sh_exec
+  " omnifunc may be overwritten by other actions.
+  setl completefunc=ClangComplete
+  setl omnifunc=ClangComplete
+
+  if ! exists('b:clang_complete_inited')
+    let b:clang_complete_inited = 1
+  else
+    return
+  endif
+
+  call s:PDebug("s:ClangCompleteInit", "start")
+  let l:gvars = s:GlobalVarSet()
 
   let l:cwd = fnameescape(getcwd())
   let l:fwd = fnameescape(expand('%:p:h'))
   exe 'lcd ' . l:fwd
-  let l:dotclang = findfile(g:clang_dotfile, '.;')
+  let l:dotclang    = findfile(g:clang_dotfile, '.;')
+  let l:dotclangow  = findfile(g:clang_dotfile_overwrite, '.;')
 
   " Firstly, add clang options for current buffer file
   let b:clang_options = ''
+
+  let l:is_ow = 0
+  if filereadable(l:dotclangow)
+    let l:is_ow = 1
+    let l:dotclang = l:dotclangow
+  endif
 
   " clang root(aka .clang located directory) for current buffer
   if filereadable(l:dotclang)
@@ -595,18 +657,26 @@ func! s:ClangCompleteInit()
   endif
   exe 'lcd '.l:cwd
 
-  " Secondly, add options defined by user
+  " Secondly, add options defined by user if is not ow
   if &filetype == 'c'
-    let b:clang_options .= ' -x c ' . g:clang_c_options
+    let b:clang_options .= ' -x c '
+    if ! l:is_ow
+      let b:clang_options .= g:clang_c_options
+    endif
   elseif &filetype == 'cpp'
-    let b:clang_options .= ' -x c++ ' . g:clang_cpp_options
+    let b:clang_options .= ' -x c++ '
+    if ! l:is_ow
+      let b:clang_options .= g:clang_cpp_options
+    endif
   endif
   
-  " add include directories
-  let l:incs = s:DiscoverIncludeDirs(g:clang_exec, b:clang_options)
-  for l:dir in l:incs
-    let b:clang_options .= ' -I' . l:dir
-  endfor
+  " add include directories if is enabled and not ow
+  if g:clang_include_sysheaders && ! l:is_ow
+    let l:incs = s:DiscoverIncludeDirs(g:clang_exec, b:clang_options)
+    for l:dir in l:incs
+      let b:clang_options .= ' -I ' . shellescape(l:dir)
+    endfor
+  endif
   
   " backup options without PCH support
   let b:clang_options_noPCH = b:clang_options
@@ -617,6 +687,9 @@ func! s:ClangCompleteInit()
   " Create close diag window command
   com! ClangClosePreviewDiagWindow  call <SID>DiagnosticsWindowClose(1,0)
 
+  " Useful to re-initialize plugin if .clang is changed
+  com! ClangCompleteInit            call <SID>ClangCompleteInit()
+
   " try to find PCH files in clang_root and clang_root/include
   " Or add `-include-pch /path/to/x.h.pch` into the root file .clang manully
   if &filetype == 'cpp' && b:clang_options !~# '-include-pch'
@@ -624,13 +697,10 @@ func! s:ClangCompleteInit()
     exe 'lcd ' . b:clang_root
     let l:afx = findfile(g:clang_stdafx_h, '.;./include') . '.pch'
     if filereadable(l:afx)
-      let b:clang_options .= ' -include-pch ' . fnameescape(l:afx)
+      let b:clang_options .= ' -include-pch ' . shellescape(l:afx)
     endif
     exe 'lcd '.l:cwd
   endif
-
-  setl completefunc=ClangComplete
-  setl omnifunc=ClangComplete
 
   if g:clang_auto   " Auto completion
     inoremap <expr> <buffer> . <SID>CompleteDot()
@@ -661,8 +731,7 @@ func! s:ClangCompleteInit()
   "  FIXME buffer unload or leave events may cause vim SEGV...
   au BufWinEnter <buffer> call <SID>DiagnosticsWindowClose(1,1)
 
-  " restore the shell
-  exe 'set shell='.l:sh
+  call s:GlobalVarRestore(l:gvars)
 endf
 "}}}
 "{{{ s:ClangExecute
@@ -685,30 +754,28 @@ endf
 func! s:ClangExecute(root, clang_options, line, col)
   let l:cwd = fnameescape(getcwd())
   exe 'lcd ' . a:root
-  let l:src = fnameescape(expand('%:p:.'))  " Thanks RageCooky, fix when a path has spaces.
+  let l:src = shellescape(expand('%:p:.'))
   let l:command = printf('%s -cc1 -fsyntax-only -code-completion-macros -code-completion-at=%s:%d:%d %s %s',
                       \ g:clang_exec, l:src, a:line, a:col, a:clang_options, l:src)
-  " Redir clang diagnostics into a tempfile.
-  " * Fix stdout/stderr buffer flush bug? of clang, that COMPLETIONs are not
-  "   flushed line by line when not output to a terminal.
-  " * FIXME: clang on Win32 will not redirect errors to stderr?
-  let l:tmps = [tempname(), tempname()] " FIXME: potential bug for tempname
+  let l:tmps = [tempname(), tempname()]
   let l:command .= ' 1>'.l:tmps[0].' 2>'.l:tmps[1]
   let l:res = [[], []]
   if !exists('v:servername') || empty(v:servername)
     let b:clang_state['state'] = 'ready'
+    call s:PDebug("s:ClangExecute::cmd", l:command, 2)
     call system(l:command)
     let l:res = s:DeleteAfterReadTmps(l:tmps)
-    call s:PDebug("s:ClangExecute::stdout", l:res[0], 2)
+    call s:PDebug("s:ClangExecute::stdout", l:res[0], 3)
     call s:PDebug("s:ClangExecute::stderr", l:res[1], 2)
   else
     " Please note that '--remote-expr' executes expressions in server, but
     " '--remote-send' only sends keys, which is same as type keys in server...
     " Here occurs a bug if uses '--remote-send', the 'col(".")' is not right.
-    let l:keys = printf('ClangExecuteDone(\"%s\",\"%s\")', l:tmps[0], l:tmps[1])
-    let l:vcmd = printf('%s -s --noplugin --servername %s --remote-expr "%s"',
-                      \ g:clang_vim_exec, v:servername, l:keys)
+    let l:keys = printf('ClangExecuteDone("%s","%s")', l:tmps[0], l:tmps[1])
+    let l:vcmd = printf('%s -s --noplugin --servername %s --remote-expr %s',
+                      \ g:clang_vim_exec, shellescape(v:servername), shellescape(l:keys))
     let l:command = '('.l:command.';'.l:vcmd.') &'
+    call s:PDebug("s:ClangExecute::cmd", l:command, 2)
     call system(l:command)
   endif
   exe 'lcd ' . l:cwd
@@ -731,7 +798,7 @@ func! ClangExecuteDone(tmp1, tmp2)
   let b:clang_state['state'] = 'sync'
   let b:clang_state['stdout'] = l:res[0]
   let b:clang_state['stderr'] = l:res[1]
-  call s:PDebug("ClangExecuteDone::stdout", l:res[0], 2)
+  call s:PDebug("ClangExecuteDone::stdout", l:res[0], 3)
   call s:PDebug("ClangExecuteDone::stderr", l:res[1], 2)
   call feedkeys("\<Esc>a")
   " As the default action of <C-x><C-o> causes a 'pattern not found'
@@ -763,8 +830,9 @@ endf
 "      'diagnostics': [], // diagnostics info
 "    }
 func! ClangComplete(findstart, base)
-  let l:sh = &shell
-  exe 'set shell='.g:clang_sh_exec
+  call s:PDebug("ClangComplete", "start")
+
+  let l:gvars = s:GlobalVarSet()
 
   if a:findstart
     call s:PDebug("ClangComplete", "phase 1")
@@ -812,7 +880,7 @@ func! ClangComplete(findstart, base)
       if b:clang_state['state'] == 'ready'
         let b:clang_state['state'] = 'busy'
         " buggy when update in the second phase ?
-        silent update
+        silent update!
         call s:ClangExecute(b:clang_root, b:clang_options, l:line, l:col)
       elseif b:clang_state['state'] == 'sync'
         let b:clang_state['state'] = 'ready'
@@ -848,7 +916,7 @@ func! ClangComplete(findstart, base)
     endif
   endif
 
-  exe 'set shell='.l:sh
+  call s:GlobalVarRestore(l:gvars)
 endf
 "}}}
 
