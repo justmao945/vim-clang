@@ -44,7 +44,7 @@ case that one want to overwrite all clang options, which means the one don't
 need automatically generated options for clang by the plugin.
 See |g:clang_dotfile_overwrite| for more details.
 
-Please note that all options in ".clang" and ".clang.ow" are must be safe
+Please note that all options in ".clang" and ".clang.ow" must be safe
 to be used by 'shell', that means special chars should always be escaped
 correctly. See |shellescape()| for more details.
 
