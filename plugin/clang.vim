@@ -105,7 +105,7 @@ if !exists('g:clang_vim_exec')
 endif
 
 " Init on c/c++ files
-au FileType c,cpp call <SID>ClangCompleteInit()
+au FileType c,cpp call <SID>ClangCompleteInit(0)
 "}}}
 "{{{ s:PDebug
 " Uses 'echom' to preserve @info when g:clang_debug is not 0.
@@ -615,14 +615,14 @@ endf
 "     b:clang_options => parepared clang cmd options
 "     b:clang_options_noPCH  => same as b:clang_options except no pch options
 "     b:clang_root => project root to run clang
-func! s:ClangCompleteInit()
+func! s:ClangCompleteInit(force)
   " omnifunc may be overwritten by other actions.
   setl completefunc=ClangComplete
   setl omnifunc=ClangComplete
 
   if ! exists('b:clang_complete_inited')
     let b:clang_complete_inited = 1
-  else
+  elseif ! a:force
     return
   endif
 
@@ -688,7 +688,7 @@ func! s:ClangCompleteInit()
   com! ClangClosePreviewDiagWindow  call <SID>DiagnosticsWindowClose(1,0)
 
   " Useful to re-initialize plugin if .clang is changed
-  com! ClangCompleteInit            call <SID>ClangCompleteInit()
+  com! ClangCompleteInit            call <SID>ClangCompleteInit(1)
 
   " try to find PCH files in clang_root and clang_root/include
   " Or add `-include-pch /path/to/x.h.pch` into the root file .clang manully
