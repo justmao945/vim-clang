@@ -28,15 +28,15 @@ vim-clang VS [Rip-Rip/clang_complete][1]
         let g:clang_c_options = '-std=gnu11'
         let g:clang_cpp_options = '-std=c++11 -stdlib=libc++'
 
-2. vim-clang is faster than clang_compelte(not use libclang).
+2. vim-clang is faster than clang_complete(not use libclang).
 vim-clang does not support libclang now, and I don't think it's a good idea to use cindex.py(python binding for clang) directly.
 If you use clang_complete with libclang and open many C/C++ source files, you'll find that VIM eats up **hundreds** of MB RAM...
     * vim-clang caches output of clang and reuses if the completion point is not changed and without errors.
     * vim-clang only runs clang once to get completions and diagnostics.
 
 3. vim-clang is more friendly than clang_complete.
-    * vim-clang uses the prview window to show prototypes for C/C++ sources.
-      Generally, C++ source has many overload functions and most of completons are very complex,
+    * vim-clang uses the preview window to show prototypes for C/C++ sources.
+      Generally, C++ source has many overload functions and most of completions are very complex,
       which is not good to put this into OmniComplete popup menu.
     * vim-clang uses a split window to show the caret diagnostics from clang.
       clang_complete uses quickfix window to show diagnostics without caret, but that's not the best choice...
