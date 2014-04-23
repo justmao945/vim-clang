@@ -107,6 +107,11 @@ endif
 " Init on c/c++ files
 au FileType c,cpp call <SID>ClangCompleteInit(0)
 "}}}
+"{{{ s:IsValidFile
+func! s:IsValidFile()
+  return &filetype == "c" || &filetype == "cpp"
+endf
+"}}}
 "{{{ s:PDebug
 " Uses 'echom' to preserve @info when g:clang_debug is not 0.
 " Call ':messages' to see debug info
@@ -258,6 +263,10 @@ endf
 "   t:clang_diags_bufnr
 "   t:clang_diags_driver_bufnr
 func! s:DiagnosticsWindowClose(pclose, driver)
+  if ! s:IsValidFile()
+    return
+  endif
+
  " close preview window
   if a:pclose && s:HasPreviewAbove()
     pclose
@@ -387,11 +396,20 @@ endf
 " parsed very fast! So only big C++ headers are recommended to be pre-compiled.
 "
 " @clang   Path of clang
-" @options Additional options passed to clang.
 " @header  Path of header to generate
 " @return  Output of clang
+" 
+" Use of global var:
+"    b:clang_options_noPCH
 "
-func! s:GenPCH(clang, options, header)
+func! s:GenPCH(clang, header)
+  if ! s:IsValidFile()
+    return
+  endif
+
+  " may want to re-read .clang, force init to update b:clang_options_noPCH
+  call s:ClangCompleteInit(1)
+
   if a:header !~? '.h'
     let cho = confirm('Not a C/C++ header: ' . a:header . "\n" .
           \ 'Continue to generate PCH file ?',
@@ -399,15 +417,21 @@ func! s:GenPCH(clang, options, header)
     if cho != 1 | return | endif
   endif
  
-  let l:header      = shellescape(a:header)
-  let l:header_pch  = shellescape(a:header . ".pch")
-  let l:command = printf('%s -cc1 %s -emit-pch -o %s %s', a:clang, a:options, l:header_pch, l:header)
+  let l:header      = shellescape(expand(a:header))
+  let l:header_pch  = l:header . ".pch"
+  let l:command = printf('%s -cc1 %s -emit-pch -o %s %s', a:clang, b:clang_options_noPCH, l:header_pch, l:header)
   call s:PDebug("s:GenPCH::cmd", l:command, 2)
   let l:clang_output = system(l:command)
 
   if v:shell_error
-    call s:PError("s:GenPCH", {'exit': v:shell_error, 'cmd': l:command, 'out': l:clang_output })
+    " uses internal diag window to show errors
+    call s:DiagnosticsWindowOpen(split(l:clang_output, '\n'))
+    call s:PDebug("s:GenPCH", {'exit': v:shell_error, 'cmd': l:command, 'out': l:clang_output }, 3)
   else
+    " may want to discover pch
+    call s:ClangCompleteInit(1)
+    " close the error window
+    call s:DiagnosticsWindowClose(0, 0)
     call s:PLog("s:GenPCH", 'Clang creates PCH flie ' . l:header . '.pch successfully!')
   endif
   return l:clang_output
@@ -615,7 +639,13 @@ endf
 "     b:clang_options => parepared clang cmd options
 "     b:clang_options_noPCH  => same as b:clang_options except no pch options
 "     b:clang_root => project root to run clang
+"
+" @force Force init
 func! s:ClangCompleteInit(force)
+  if ! s:IsValidFile()
+    return
+  endif
+
   " omnifunc may be overwritten by other actions.
   setl completefunc=ClangComplete
   setl omnifunc=ClangComplete
@@ -649,6 +679,9 @@ func! s:ClangCompleteInit(force)
     let b:clang_root = fnameescape(fnamemodify(l:dotclang, ':p:h'))
     let l:opts = readfile(l:dotclang)
     for l:opt in l:opts
+      if l:opt =~ "^[ \t]*//"
+        continue
+      endif
       let b:clang_options .= ' ' . l:opt
     endfor
   else
@@ -682,7 +715,7 @@ func! s:ClangCompleteInit(force)
   let b:clang_options_noPCH = b:clang_options
 
   " Create GenPCH command
-  com! -nargs=* ClangGenPCHFromFile call <SID>GenPCH(g:clang_exec, b:clang_options_noPCH, <f-args>)
+  com! -nargs=* ClangGenPCHFromFile call <SID>GenPCH(g:clang_exec, <f-args>)
   
   " Create close diag window command
   com! ClangClosePreviewDiagWindow  call <SID>DiagnosticsWindowClose(1,0)
