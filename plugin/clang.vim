@@ -405,6 +405,9 @@ func! s:GenPCH(clang, options, header)
     return
   endif
 
+  " may want to re-read .clang, force init
+  call s:ClangCompleteInit(1)
+
   if a:header !~? '.h'
     let cho = confirm('Not a C/C++ header: ' . a:header . "\n" .
           \ 'Continue to generate PCH file ?',
@@ -413,7 +416,7 @@ func! s:GenPCH(clang, options, header)
   endif
  
   let l:header      = shellescape(expand(a:header))
-  let l:header_pch  = shellescape(a:header . ".pch")
+  let l:header_pch  = l:header . ".pch"
   let l:command = printf('%s -cc1 %s -emit-pch -o %s %s', a:clang, a:options, l:header_pch, l:header)
   call s:PDebug("s:GenPCH::cmd", l:command, 2)
   let l:clang_output = system(l:command)
@@ -422,6 +425,7 @@ func! s:GenPCH(clang, options, header)
     call s:DiagnosticsWindowOpen(split(l:clang_output, '\n'))
     call s:PDebug("s:GenPCH", {'exit': v:shell_error, 'cmd': l:command, 'out': l:clang_output })
   else
+    call s:DiagnosticsWindowClose(0, 0)
     call s:PLog("s:GenPCH", 'Clang creates PCH flie ' . l:header . '.pch successfully!')
   endif
   return l:clang_output
