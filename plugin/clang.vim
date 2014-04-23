@@ -107,6 +107,11 @@ endif
 " Init on c/c++ files
 au FileType c,cpp call <SID>ClangCompleteInit(0)
 "}}}
+"{{{ s:IsValidFile
+func! s:IsValidFile()
+  return &filetype == "c" || &filetype == "cpp"
+endf
+"}}}
 "{{{ s:PDebug
 " Uses 'echom' to preserve @info when g:clang_debug is not 0.
 " Call ':messages' to see debug info
@@ -258,6 +263,10 @@ endf
 "   t:clang_diags_bufnr
 "   t:clang_diags_driver_bufnr
 func! s:DiagnosticsWindowClose(pclose, driver)
+  if ! s:IsValidFile()
+    return
+  endif
+
  " close preview window
   if a:pclose && s:HasPreviewAbove()
     pclose
@@ -392,6 +401,10 @@ endf
 " @return  Output of clang
 "
 func! s:GenPCH(clang, options, header)
+  if ! s:IsValidFile()
+    return
+  endif
+
   if a:header !~? '.h'
     let cho = confirm('Not a C/C++ header: ' . a:header . "\n" .
           \ 'Continue to generate PCH file ?',
@@ -617,6 +630,10 @@ endf
 "     b:clang_options_noPCH  => same as b:clang_options except no pch options
 "     b:clang_root => project root to run clang
 func! s:ClangCompleteInit(force)
+  if ! s:IsValidFile()
+    return
+  endif
+
   " omnifunc may be overwritten by other actions.
   setl completefunc=ClangComplete
   setl omnifunc=ClangComplete
