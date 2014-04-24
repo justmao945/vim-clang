@@ -60,7 +60,7 @@ If you use clang_complete with libclang and open many C/C++ source files, you'll
 
 vim-clang VS [Valloric/YouCompleteMe][5]
 --------------------
-[YouCompleteMe][5] is more powerful than vim-clang, and have a well designed client-server
+[YouCompleteMe][5] is more powerful than vim-clang, that has a well designed client-server
 architecture to deal the memory problem in clang_complete.
 
 
