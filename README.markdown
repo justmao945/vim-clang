@@ -58,6 +58,11 @@ If you use clang_complete with libclang and open many C/C++ source files, you'll
 
 5. Better PCH support. vim-clang will find stdafx.h.pch automatically.
 
+vim-clang VS [Valloric/YouCompleteMe][5]
+--------------------
+[YouCompleteMe][5] is more powerful than vim-clang, and have a well designed client-server
+architecture to deal the memory problem in clang_complete.
+
 
 Asynchronized mode [new]
 --------------------
@@ -88,4 +93,4 @@ Now only tested on Linux (Ubuntu/Debian) and Mac OSX
 [2]: http://www.ishani.org
 [3]: http://www.ishani.org/web/articles/code/clang-win32/
 [4]: https://github.com/tpope/vim-pathogen
-
+[5]: https://github.com/Valloric/YouCompleteMe
