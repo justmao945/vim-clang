@@ -21,7 +21,7 @@ CONFIG                                          *clang-config*
 
 Vim-clang uses a file named ".clang" (same as .clang_complete for clang_complete)
 in the project root to save Clang options. Relative path is recommended when
-configure the include directory, so we can move the project anywhere...
+configure the include directory, so we can move the project to anywhere...
 Here is a tree to show the location of file '.clang'
 .
 ├── build/
@@ -37,7 +37,7 @@ Here is a tree to show the location of file '.clang'
 └── yacl/
 
 The file ".clang" only contains: "-I." to include files in directory "./".
-So that the source file should uses #include "yacl/xxx.h" to include files.
+So that the source file should use #include "yacl/xxx.h" to include files.
 
 Now a new similar file named ".clang.ow" is added to deal with the special
 case that one want to overwrite all clang options, which means the one don't
@@ -45,8 +45,8 @@ need automatically generated options for clang by the plugin.
 See |g:clang_dotfile_overwrite| for more details.
 
 Please note that all options in ".clang" and ".clang.ow" must be safe
-to be used by 'shell', that means special chars should always be escaped
-correctly. See |shellescape()| for more details.
+to be used by the 'shell', that means special chars should always be 
+escaped correctly. See |shellescape()| for more details.
 
 ==============================================================================
 VARIABLES                                       *clang-variables*
@@ -96,14 +96,14 @@ g:clang_dotfile                         *g:clang_dotfile*
 <
 g:clang_dotfile_overwrite               *g:clang_dotfile_overwrite*
         Same as |g:clang_dotfile| but has higher priority than it.
-        Options in |g:clang_dotfile| will be append to discovered
+        Options in |g:clang_dotfile| will be appended to discovered
         options that from |g:clang_c_options|, |g:clang_cpp_options|
         and |g:clang_include_sysheaders|. But if |g:clang_dotfile_overwrite|
         file is exist, plugin will not do the discovery anymore, only add
         the minimum of options and append |g:clang_dotfile_overwrite|
-        to them to before calling clang.
+        to them before calling clang.
         Note: This is very useful if you are doing some cross-platform
-        projects, they may have different include directory and options.
+        projects, they may have different include directories and options.
     Default: >
         let g:clang_dotfile_overwrite = '.clang.ow'
 <
@@ -174,7 +174,7 @@ g:clang_stdafx_h                        *g:clang_stdafx_h*
 <
 g:clang_vim_exec                        *g:clang_vim_exec*
         Name or path of executable vim.
-        Note: This is option is used in async mode to startup a new vim
+        Note: This option is used in async mode to startup a new vim
         process. Please add vim to your system PATH or overwrite this var.
         Attention that default the command 'vim' will not act as a server,
         instead you must add '--servername XX' to start a unique server.
@@ -235,7 +235,7 @@ CHANGELOG                                        *clang-changelog*
 ==============================================================================
 CREDITS                                          *clang-credits*
 
-Thanks to the following people for suggestions and patches:
+Thanks to following people for suggestions and patches:
 * RageCooky
 * wookayin
 * yuquan23459
