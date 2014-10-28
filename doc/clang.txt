@@ -107,6 +107,12 @@ g:clang_dotfile_overwrite               *g:clang_dotfile_overwrite*
     Default: >
         let g:clang_dotfile_overwrite = '.clang.ow'
 <
+g:clang_load_if_clang_dotfile           g:clang_load_if_clang_dotfile
+        If equals to 1, this plugin will be loaded only if g:clang_dotfile or
+        g:clang_dotfile_overwrite file is found in the at his root.
+    Default: >
+        let g:clang_load_if_clang_dotfile = 0
+
 g:clang_exec                            *g:clang_exec*
         Name or path of executable clang. Use this if clang has a
         non-standard name, or isn't in the path.
