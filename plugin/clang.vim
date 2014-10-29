@@ -35,6 +35,28 @@ if exists('g:clang_loaded')
 endif
 let g:clang_loaded = 1
 
+if !exists('g:clang_load_if_clang_dotfile')
+  let g:clang_load_if_clang_dotfile = 0
+endif
+
+if !exists('g:clang_dotfile')
+  let g:clang_dotfile = '.clang'
+endif
+
+if !exists('g:clang_dotfile_overwrite')
+  let g:clang_dotfile_overwrite = '.clang.ow'
+endif
+
+func! s:isClangFileExists()
+  let l:dotclang    = findfile(g:clang_dotfile, '.;')
+  let l:dotclangow  = findfile(g:clang_dotfile_overwrite, '.;')
+  return strlen(l:dotclang) + strlen(l:dotclangow)
+endf
+
+if ( s:isClangFileExists() == 0 && g:clang_load_if_clang_dotfile == 1 )
+  finish
+endif
+
 if !exists('g:clang_auto')
   let g:clang_auto = 1
 endif
@@ -61,14 +83,6 @@ endif
 
 if !exists('g:clang_diagsopt') || g:clang_diagsopt !~# '^[a-z]\+\(:[0-9]\)\?$'
   let g:clang_diagsopt = 'rightbelow:6'
-endif
-
-if !exists('g:clang_dotfile')
-  let g:clang_dotfile = '.clang'
-endif
-
-if !exists('g:clang_dotfile_overwrite')
-  let g:clang_dotfile_overwrite = '.clang.ow'
 endif
 
 if !exists('g:clang_exec')
