@@ -113,7 +113,7 @@ au FileType c,cpp call <SID>ClangCompleteInit(0)
 "}}}
 "{{{ s:IsValidFile
 func! s:IsValidFile()
-  return &filetype == "c" || &filetype == "cpp"
+  return ( &filetype == "c" || &filetype == "cpp" ) && filereadable(expand("%"))
 endf
 "}}}
 "{{{ s:PDebug
