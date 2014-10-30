@@ -47,16 +47,6 @@ if !exists('g:clang_dotfile_overwrite')
   let g:clang_dotfile_overwrite = '.clang.ow'
 endif
 
-func! s:isClangFileExists()
-  let l:dotclang    = findfile(g:clang_dotfile, '.;')
-  let l:dotclangow  = findfile(g:clang_dotfile_overwrite, '.;')
-  return strlen(l:dotclang) + strlen(l:dotclangow)
-endf
-
-if ( s:isClangFileExists() == 0 && g:clang_load_if_clang_dotfile == 1 )
-  finish
-endif
-
 if !exists('g:clang_auto')
   let g:clang_auto = 1
 endif
@@ -660,6 +650,19 @@ func! s:ClangCompleteInit(force)
     return
   endif
 
+  " find project file first
+  let l:cwd = fnameescape(getcwd())
+  let l:fwd = fnameescape(expand('%:p:h'))
+  exe 'lcd ' . l:fwd
+  let l:dotclang    = findfile(g:clang_dotfile, '.;')
+  let l:dotclangow  = findfile(g:clang_dotfile_overwrite, '.;')
+  exe 'lcd '.l:cwd
+
+  let l:has_dotclang = strlen(l:dotclang) + strlen(l:dotclangow)
+  if !l:has_dotclang && g:clang_load_if_clang_dotfile
+    return
+  end
+
   " omnifunc may be overwritten by other actions.
   setl completefunc=ClangComplete
   setl omnifunc=ClangComplete
@@ -672,12 +675,6 @@ func! s:ClangCompleteInit(force)
 
   call s:PDebug("s:ClangCompleteInit", "start")
   let l:gvars = s:GlobalVarSet()
-
-  let l:cwd = fnameescape(getcwd())
-  let l:fwd = fnameescape(expand('%:p:h'))
-  exe 'lcd ' . l:fwd
-  let l:dotclang    = findfile(g:clang_dotfile, '.;')
-  let l:dotclangow  = findfile(g:clang_dotfile_overwrite, '.;')
 
   " Firstly, add clang options for current buffer file
   let b:clang_options = ''
@@ -702,7 +699,6 @@ func! s:ClangCompleteInit(force)
     " or means source file directory
     let b:clang_root = l:fwd
   endif
-  exe 'lcd '.l:cwd
 
   " Secondly, add options defined by user if is not ow
   if &filetype == 'c'
@@ -802,7 +798,7 @@ func! s:ClangExecute(root, clang_options, line, col)
   let l:cwd = fnameescape(getcwd())
   exe 'lcd ' . a:root
   let l:src = shellescape(expand('%:p:.'))
-  let l:command = printf('%s -cc1 -fsyntax-only -code-completion-macros -code-completion-at=%s:%d:%d %s %s',
+  let l:command = printf('%s -fsyntax-only -Xclang -code-completion-macros -Xclang -code-completion-at=%s:%d:%d %s %s',
                       \ g:clang_exec, l:src, a:line, a:col, a:clang_options, l:src)
   let l:tmps = [tempname(), tempname()]
   let l:command .= ' 1>'.l:tmps[0].' 2>'.l:tmps[1]

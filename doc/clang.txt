@@ -246,6 +246,7 @@ Thanks to following people for suggestions and patches:
 * wookayin
 * yuquan23459
 * adelarsq
+* jreybert
 
 ==============================================================================
 vim:tw=78:ts=8:ft=help:norl
