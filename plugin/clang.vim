@@ -802,7 +802,7 @@ func! s:ClangExecute(root, clang_options, line, col)
   let l:cwd = fnameescape(getcwd())
   exe 'lcd ' . a:root
   let l:src = shellescape(expand('%:p:.'))
-  let l:command = printf('%s -cc1 -fsyntax-only -code-completion-macros -code-completion-at=%s:%d:%d %s %s',
+  let l:command = printf('%s -fsyntax-only -Xclang -code-completion-at=%s:%d:%d -Xclang -code-completion-macros %s %s',
                       \ g:clang_exec, l:src, a:line, a:col, a:clang_options, l:src)
   let l:tmps = [tempname(), tempname()]
   let l:command .= ' 1>'.l:tmps[0].' 2>'.l:tmps[1]
