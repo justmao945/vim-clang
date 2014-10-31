@@ -108,6 +108,10 @@ if !exists('g:clang_vim_exec')
   endif
 endif
 
+if !exists('g:clang_use_path')
+  let g:clang_use_path = 1
+endif
+
 " Init on c/c++ files
 au FileType c,cpp call <SID>ClangCompleteInit(0)
 "}}}
@@ -721,6 +725,21 @@ func! s:ClangCompleteInit(force)
     endfor
   endif
   
+  " parse include path from &path
+  if g:clang_use_path
+    let l:dirs = map(split(&path, '\\\@<![, ]'), 'substitute(v:val, ''\\\([, ]\)'', ''\1'', ''g'')')
+    for l:dir in l:dirs
+      if len(l:dir) == 0 || !isdirectory(l:dir)
+        continue
+      endif
+
+      " Add only absolute paths
+      if matchstr(l:dir, '\s*/') != ''
+        let b:clang_options .= ' -I ' . shellescape(l:dir)
+      endif
+    endfor
+  endif
+
   " backup options without PCH support
   let b:clang_options_noPCH = b:clang_options
 
