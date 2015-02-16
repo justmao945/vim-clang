@@ -892,9 +892,14 @@ endf
 "      'diagnostics': [], // diagnostics info
 "    }
 func! ClangComplete(findstart, base)
-  call s:PDebug("ClangComplete", "start")
-
   let l:gvars = s:GlobalVarSet()
+  let l:res = s:ClangComplete(a:findstart, a:base)
+  call s:GlobalVarRestore(l:gvars)
+  return l:res
+endf
+
+func! s:ClangComplete(findstart, base)
+  call s:PDebug("ClangComplete", "start")
 
   if a:findstart
     call s:PDebug("ClangComplete", "phase 1")
@@ -977,8 +982,6 @@ func! ClangComplete(findstart, base)
       return []
     endif
   endif
-
-  call s:GlobalVarRestore(l:gvars)
 endf
 "}}}
 
