@@ -810,7 +810,7 @@ func! s:ClangCompleteInit(force)
   " the driver state, user may not hope close the window if the driver is
   " still available.
   "  FIXME buffer unload or leave events may cause vim SEGV...
-  au BufWinEnter <buffer> call <SID>DiagnosticsWindowClose(1,1)
+  au BufWinLeave <buffer> call <SID>DiagnosticsWindowClose(1,1)
   
   au BufEnter <buffer> call <SID>BufVarSet()
   au BufLeave <buffer> call <SID>BufVarRestore()
