@@ -475,6 +475,25 @@ func! s:GlobalVarRestore(values)
   exe 'set completeopt='.a:values['completeopt']
 endf
 " }}}
+" {{{ s:BufVarSet
+" Store current global var into b:clang_bufvars_storage
+" Set global options that different in different buffer
+func! s:BufVarSet()
+  let b:clang_bufvars_storage= {
+      \ 'completeopt':  &completeopt,
+  \ }
+  if &filetype == 'c' && !empty(g:clang_c_completeopt)
+    exe 'set completeopt='.g:clang_c_completeopt
+  elseif &filetype == 'cpp' && !empty(g:clang_cpp_completeopt)
+    exe 'set completeopt='.g:clang_cpp_completeopt
+  endif
+endf
+" {{{ s:BufVarRestore
+" Restore global vim options
+func! s:BufVarRestore()
+  exe 'set completeopt='.b:clang_bufvars_storage['completeopt']
+endf
+" }}}
 " {{{ s:HasPreviewAbove
 " 
 " Detect above view is preview window or not.
@@ -792,6 +811,9 @@ func! s:ClangCompleteInit(force)
   " still available.
   "  FIXME buffer unload or leave events may cause vim SEGV...
   au BufWinEnter <buffer> call <SID>DiagnosticsWindowClose(1,1)
+  
+  au BufEnter <buffer> call <SID>BufVarSet()
+  au BufLeave <buffer> call <SID>BufVarRestore()
 
   call s:GlobalVarRestore(l:gvars)
 endf
