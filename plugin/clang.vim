@@ -150,6 +150,26 @@ func! s:PLog(head, info)
   echom printf("Clang: log: %s >>> %s", string(a:head), string(a:info))
 endf
 "}}}
+" {{{ s:BufVarSet
+" Store current global var into b:clang_bufvars_storage
+" Set global options that different in different buffer
+func! s:BufVarSet()
+  let b:clang_bufvars_storage= {
+      \ 'completeopt':  &completeopt,
+  \ }
+  if &filetype == 'c' && !empty(g:clang_c_completeopt)
+    exe 'set completeopt='.g:clang_c_completeopt
+  elseif &filetype == 'cpp' && !empty(g:clang_cpp_completeopt)
+    exe 'set completeopt='.g:clang_cpp_completeopt
+  endif
+endf
+"}}}
+" {{{ s:BufVarRestore
+" Restore global vim options
+func! s:BufVarRestore()
+  exe 'set completeopt='.b:clang_bufvars_storage['completeopt']
+endf
+" }}}
 " {{{ s:Complete[Dot|Arrow|Colon]
 " Tigger a:cmd when cursor is after . -> and ::
 
@@ -261,58 +281,6 @@ func! s:DiscoverIncludeDirs(clang, options)
   return l:res
 endf
 "}}}
-""{{{ s:DiagnosticsWindowClose
-" Close diagnostics window or quit the editor
-" @when_bufwinleave set to 1 if is called by BufWinLeave event
-" Tab variable
-"   t:clang_diags_bufnr
-"   t:clang_diags_driver_bufnr
-func! s:DiagnosticsWindowClose(when_bufwinleave)
-  call s:PDebug("s:DiagnosticsWindowClose", "try")
-
-  let l:cbn = bufnr('%')
-  " is invalid file and not in diag window
-  if ! s:IsValidFile() && l:cbn != t:clang_diags_bufnr
-    return
-  endif
-
-  " is not leave from the driver buffer window
-  if a:when_bufwinleave && l:cbn != t:clang_diags_driver_bufnr
-    return
-  end
-
-  " diag window buffer is not exist
-  if !exists('t:clang_diags_bufnr')
-    return
-  endif
-
-  let l:cwn = bufwinnr(l:cbn)
-  let l:dwn = bufwinnr(t:clang_diags_bufnr)
-
-  " the window is not exist
-  if l:dwn == -1
-    return
-  endif
-
-  exe l:dwn . 'wincmd w'
-  if a:when_bufwinleave && winbufnr(3) == -1
-    qa!     " quit editor when called before leave the driver window
-  else
-    hide   " just hide the diag window
-  endif
-  exe l:cwn . 'wincmd w'
-
-  call s:PDebug("s:DiagnosticsWindowClose", l:dwn)
-endf
-"}}}
-"{{{ s:DiagnosticsPreviewWindowClose
-" @when_bufwinleave set to 1 if is called by BufWinLeave event
-func! s:DiagnosticsPreviewWindowClose(when_bufwinleave)
-  call s:PDebug("s:DiagnosticsPreviewWindowClose", "")
-  pclose
-  call s:DiagnosticsWindowClose(a:when_bufwinleave)
-endf
-"}}}
 "{{{ s:DiagnosticsWindowOpen
 " Split a window to show clang diagnostics. If there's no diagnostics, close
 " the split window.
@@ -419,6 +387,58 @@ func! s:DiagnosticsWindowOpen(diags)
   return t:clang_diags_bufnr
 endf
 "}}}
+""{{{ s:DiagnosticsWindowClose
+" Close diagnostics window or quit the editor
+" @when_bufwinleave set to 1 if is called by BufWinLeave event
+" Tab variable
+"   t:clang_diags_bufnr
+"   t:clang_diags_driver_bufnr
+func! s:DiagnosticsWindowClose(when_bufwinleave)
+  call s:PDebug("s:DiagnosticsWindowClose", "try")
+
+  let l:cbn = bufnr('%')
+  " is invalid file and not in diag window
+  if ! s:IsValidFile() && l:cbn != t:clang_diags_bufnr
+    return
+  endif
+
+  " is not leave from the driver buffer window
+  if a:when_bufwinleave && l:cbn != t:clang_diags_driver_bufnr
+    return
+  end
+
+  " diag window buffer is not exist
+  if !exists('t:clang_diags_bufnr')
+    return
+  endif
+
+  let l:cwn = bufwinnr(l:cbn)
+  let l:dwn = bufwinnr(t:clang_diags_bufnr)
+
+  " the window is not exist
+  if l:dwn == -1
+    return
+  endif
+
+  exe l:dwn . 'wincmd w'
+  if a:when_bufwinleave && winbufnr(3) == -1
+    qa!     " quit editor when called before leave the driver window
+  else
+    hide   " just hide the diag window
+  endif
+  exe l:cwn . 'wincmd w'
+
+  call s:PDebug("s:DiagnosticsWindowClose", l:dwn)
+endf
+"}}}
+"{{{ s:DiagnosticsPreviewWindowClose
+" @when_bufwinleave set to 1 if is called by BufWinLeave event
+func! s:DiagnosticsPreviewWindowClose(when_bufwinleave)
+  call s:PDebug("s:DiagnosticsPreviewWindowClose", "")
+  pclose
+  call s:DiagnosticsWindowClose(a:when_bufwinleave)
+endf
+"}}}
 "{{{  s:GenPCH
 " Generate clang precompiled header.
 " A new file with postfix '.pch' will be created if success.
@@ -495,26 +515,6 @@ func! s:GlobalVarRestore(values)
   endif
   exe 'set shell='.a:values['shell']
   exe 'set completeopt='.a:values['completeopt']
-endf
-" }}}
-" {{{ s:BufVarSet
-" Store current global var into b:clang_bufvars_storage
-" Set global options that different in different buffer
-func! s:BufVarSet()
-  let b:clang_bufvars_storage= {
-      \ 'completeopt':  &completeopt,
-  \ }
-  if &filetype == 'c' && !empty(g:clang_c_completeopt)
-    exe 'set completeopt='.g:clang_c_completeopt
-  elseif &filetype == 'cpp' && !empty(g:clang_cpp_completeopt)
-    exe 'set completeopt='.g:clang_cpp_completeopt
-  endif
-endf
-"}}}
-" {{{ s:BufVarRestore
-" Restore global vim options
-func! s:BufVarRestore()
-  exe 'set completeopt='.b:clang_bufvars_storage['completeopt']
 endf
 " }}}
 " {{{ s:HasPreviewAbove
