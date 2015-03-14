@@ -422,9 +422,11 @@ func! s:DiagnosticsWindowClose(when_bufwinleave)
 
   exe l:dwn . 'wincmd w'
   if a:when_bufwinleave && winbufnr(3) == -1
-    qa!     " quit editor when called before leave the driver window
+    " quit editor when called before leave the driver window
+    qa!
   else
-    hide   " just hide the diag window
+    " just hide the diag window
+    hide
   endif
   exe l:cwn . 'wincmd w'
 
