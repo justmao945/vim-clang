@@ -14,7 +14,7 @@ This is a plugin to complete C/C++ source code using Clang.
 
 - Requirements
     - Executable
-        Clang   - htt://clang.llvm.org
+        Clang   - http://clang.llvm.org
 
 ==============================================================================
 CONFIG                                          *clang-config*
@@ -198,7 +198,7 @@ ClangGenPCHFromFile <stdafx.h>          *ClangGenPCHFromFile*
         Generate PCH file from the give file name <stdafx.h>, which can
         be % (aka current file name).
 
-ClangClosePreviewDiagWindow             *ClangClosePreviewDiagWindow*
+ClangCloseWindow                        *ClangCloseWindow*
         Close preview and diagnostics window for current buffer.
         Or uses a leader map to do this this: >
             map <silent> <Leader>c <Esc>:ClangClosePreviewDiagWindow<CR>
