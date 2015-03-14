@@ -262,34 +262,55 @@ func! s:DiscoverIncludeDirs(clang, options)
 endf
 "}}}
 ""{{{ s:DiagnosticsWindowClose
-" Close diagnostics and preview window
-" @pclose Call pclose if not 0
-" @driver Test driver if not 0, and close the window if the driver window is
-"         not exist.
-"
+" Close diagnostics window or quit the editor
+" @when_bufwinleave set to 1 if is called by BufWinLeave event
 " Tab variable
 "   t:clang_diags_bufnr
 "   t:clang_diags_driver_bufnr
-func! s:DiagnosticsWindowClose(pclose, driver)
-  if ! s:IsValidFile()
+func! s:DiagnosticsWindowClose(when_bufwinleave)
+  call s:PDebug("s:DiagnosticsWindowClose", "try")
+
+  let l:cbn = bufnr('%')
+  " is invalid file and not in diag window
+  if ! s:IsValidFile() && l:cbn != t:clang_diags_bufnr
     return
   endif
 
- " close preview window
-  if a:pclose && s:HasPreviewAbove()
-    pclose
+  " is not leave from the driver buffer window
+  if a:when_bufwinleave && l:cbn != t:clang_diags_driver_bufnr
+    return
+  end
+
+  " diag window buffer is not exist
+  if !exists('t:clang_diags_bufnr')
+    return
   endif
-  if exists('t:clang_diags_bufnr')
-    let l:cwn = bufwinnr(bufnr('%'))
-    let l:dwn = bufwinnr(t:clang_diags_bufnr)
-    if l:dwn != -1 && (!a:driver || (a:driver && bufwinnr(t:clang_diags_driver_bufnr) == -1))
-      exe l:dwn . 'wincmd w'
-      call s:PDebug("s:DiagnosticsWindowClose", l:dwn)
-      hide
-      exe l:cwn . 'wincmd w'
-    endif
+
+  let l:cwn = bufwinnr(l:cbn)
+  let l:dwn = bufwinnr(t:clang_diags_bufnr)
+
+  " the window is not exist
+  if l:dwn == -1
+    return
   endif
-  return -1
+
+  exe l:dwn . 'wincmd w'
+  if a:when_bufwinleave && winbufnr(3) == -1
+    qa!     " quit editor when called before leave the driver window
+  else
+    hide   " just hide the diag window
+  endif
+  exe l:cwn . 'wincmd w'
+
+  call s:PDebug("s:DiagnosticsWindowClose", l:dwn)
+endf
+"}}}
+"{{{ s:DiagnosticsPreviewWindowClose
+" @when_bufwinleave set to 1 if is called by BufWinLeave event
+func! s:DiagnosticsPreviewWindowClose(when_bufwinleave)
+  call s:PDebug("s:DiagnosticsPreviewWindowClose", "")
+  pclose
+  call s:DiagnosticsWindowClose(a:when_bufwinleave)
 endf
 "}}}
 "{{{ s:DiagnosticsWindowOpen
@@ -300,7 +321,7 @@ endf
 "   g:clang_statusline
 " Tab variable
 "   t:clang_diags_bufnr         <= diagnostics window bufnr
-"   t:clang_diags_driver_bufnr  <= the driver buffer numer
+"   t:clang_diags_driver_bufnr  <= the driver buffer number, who opens this window
 "   NOTE: Don't use winnr, winnr maybe changed.
 " @diags A list of lines from clang diagnostics, or a diagnostics file name.
 " @return -1 or buffer number t:clang_diags_bufnr
@@ -336,7 +357,8 @@ func! s:DiagnosticsWindowOpen(diags)
     endif
   elseif empty(l:diags)
     " just close window(but not preview window) and return
-    return s:DiagnosticsWindowClose(0, 0)
+    s:DiagnosticsWindowClose(0)
+    return -1
   else
     " goto the exist window
     call s:PDebug("s:DiagnosticsWindowOpen::wincmd", l:winnr)
@@ -439,7 +461,7 @@ func! s:GenPCH(clang, header)
     " may want to discover pch
     call s:ClangCompleteInit(1)
     " close the error window
-    call s:DiagnosticsWindowClose(0, 0)
+    call s:DiagnosticsWindowClose(0)
     call s:PLog("s:GenPCH", 'Clang creates PCH flie ' . l:header . '.pch successfully!')
   endif
   return l:clang_output
@@ -488,6 +510,7 @@ func! s:BufVarSet()
     exe 'set completeopt='.g:clang_cpp_completeopt
   endif
 endf
+"}}}
 " {{{ s:BufVarRestore
 " Restore global vim options
 func! s:BufVarRestore()
@@ -765,8 +788,8 @@ func! s:ClangCompleteInit(force)
   " Create GenPCH command
   com! -nargs=* ClangGenPCHFromFile call <SID>GenPCH(g:clang_exec, <f-args>)
   
-  " Create close diag window command
-  com! ClangClosePreviewDiagWindow  call <SID>DiagnosticsWindowClose(1,0)
+  " Create close diag and preview window command
+  com! ClangCloseWindow  call <SID>DiagnosticsPreviewWindowClose(0)
 
   " Useful to re-initialize plugin if .clang is changed
   com! ClangCompleteInit            call <SID>ClangCompleteInit(1)
@@ -806,12 +829,7 @@ func! s:ClangCompleteInit(force)
           \ endif
   endif
 
-  " Close diagnostics window when enter new buffer window, and must test
-  " the driver state, user may not hope close the window if the driver is
-  " still available.
-  "  FIXME buffer unload or leave events may cause vim SEGV...
-  au BufWinLeave <buffer> call <SID>DiagnosticsWindowClose(1,1)
-  
+  au BufWinLeave <buffer> call <SID>DiagnosticsPreviewWindowClose(1)
   au BufEnter <buffer> call <SID>BufVarSet()
   au BufLeave <buffer> call <SID>BufVarRestore()
 
@@ -1008,4 +1026,3 @@ endf
 "}}}
 
 " vim: set shiftwidth=2 softtabstop=2 tabstop=2:
-
