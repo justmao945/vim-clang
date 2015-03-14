@@ -945,10 +945,6 @@ func! s:ClangComplete(findstart, base)
 
   if a:findstart
     call s:PDebug("ClangComplete", "phase 1")
-    " close preview window not owned by this view before completion
-    if ! s:HasPreviewAbove()
-      pclose
-    endif
     if !exists('b:clang_state')
       let b:clang_state = { 'state': 'ready', 'stdout': [], 'stderr': [] }
     endif
@@ -1007,7 +1003,7 @@ func! s:ClangComplete(findstart, base)
     " update completions by new l:base
     let b:clang_cache['completions'] = s:ParseCompletionResult(b:clang_state['stdout'], l:base)
     " close preview window if empty
-    if empty(b:clang_cache['completions']) && s:HasPreviewAbove()
+    if empty(b:clang_cache['completions'])
       pclose
     endif
     " call to show diagnostics
