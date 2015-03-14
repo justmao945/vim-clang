@@ -325,7 +325,7 @@ func! s:DiagnosticsWindowOpen(diags)
     endif
   elseif empty(l:diags)
     " just close window(but not preview window) and return
-    s:DiagnosticsWindowClose(0)
+    call s:DiagnosticsWindowClose(0)
     return -1
   else
     " goto the exist window
