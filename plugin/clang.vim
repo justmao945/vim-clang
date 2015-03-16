@@ -394,6 +394,11 @@ endf
 "   t:clang_diags_bufnr
 "   t:clang_diags_driver_bufnr
 func! s:DiagnosticsWindowClose(when_bufwinleave)
+  " diag window buffer is not exist
+  if !exists('t:clang_diags_bufnr')
+    return
+  endif
+
   call s:PDebug("s:DiagnosticsWindowClose", "try")
 
   let l:cbn = bufnr('%')
@@ -406,11 +411,6 @@ func! s:DiagnosticsWindowClose(when_bufwinleave)
   if a:when_bufwinleave && l:cbn != t:clang_diags_driver_bufnr
     return
   end
-
-  " diag window buffer is not exist
-  if !exists('t:clang_diags_bufnr')
-    return
-  endif
 
   let l:cwn = bufwinnr(l:cbn)
   let l:dwn = bufwinnr(t:clang_diags_bufnr)
