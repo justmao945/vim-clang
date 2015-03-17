@@ -408,7 +408,7 @@ func! s:DiagnosticsWindowClose(when_bufwinleave)
   endif
 
   " is not leave from the driver buffer window
-  if a:when_bufwinleave && l:cbn != t:clang_diags_driver_bufnr
+  if a:when_bufwinleave && (!exists('t:clang_diags_driver_bufnr') || l:cbn != t:clang_diags_driver_bufnr)
     return
   end
 
