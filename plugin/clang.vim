@@ -223,8 +223,12 @@ func! s:DeleteAfterReadTmps(tmps)
   let l:res = []
   let l:i = 0
   while l:i < len(a:tmps)
-    call add(l:res, readfile(a:tmps[ l:i ]))
-    call delete(a:tmps[ l:i ])
+    if filereadable(a:tmps[l:i])
+      call add(l:res, readfile(a:tmps[ l:i ]))
+      call delete(a:tmps[ l:i ])
+    else
+      call s:PError("s:DeleteAfterReadTmps", "Invalid tmpfile: ".string(l:i))
+    endif
     let l:i = l:i + 1
   endwhile
   return l:res
@@ -838,6 +842,48 @@ func! s:ClangCompleteInit(force)
   call s:GlobalVarRestore(l:gvars)
 endf
 "}}}
+"{{{ AppendToFile
+" Append line to exist file.
+func! AppendToFile(file, lines)
+    call writefile(readfile(a:file)+a:lines, a:file)
+endf
+"}}}
+"{{{ ClangExecuteNeoJobHandler
+" Handler job events: stdout, stderr, exited.
+func! ClangExecuteNeoJobHandler(job_id, data, event)
+  if a:event == 'stdout'
+    let l:datalen = len(a:data)
+    " Remove needless newline
+    let l:xdata = remove(a:data, l:datalen-1)
+    let l:fname = self.fstdout
+    if filereadable(l:fname)
+      call AppendToFile(l:fname, a:data)
+    else
+      call writefile(a:data, l:fname)
+    endif
+  elseif a:event == 'stderr'
+    let l:datalen = len(a:data)
+    " Remove needless newline
+    let l:xdata = remove(a:data, l:datalen-1)
+    let l:fname = self.fstderr
+    if filereadable(l:fname)
+      call AppendToFile(l:fname, a:data)
+    else
+      call writefile(a:data, l:fname)
+    endif
+  else
+    call ClangExecuteDone(self.fstdout, self.fstderr)
+  endif
+endf
+"}}}
+"{{{ s:neojobcallbacks
+"callbacks should be global var.
+let s:neojobcallbacks = {
+\ 'on_stdout': function('ClangExecuteNeoJobHandler'),
+\ 'on_stderr': function('ClangExecuteNeoJobHandler'),
+\ 'on_exit': function('ClangExecuteNeoJobHandler')
+\ }
+"}}}
 "{{{ s:ClangExecute
 " Execute clang binary to generate completions and diagnostics.
 " Global variable:
@@ -864,7 +910,24 @@ func! s:ClangExecute(root, clang_options, line, col)
   let l:tmps = [tempname(), tempname()]
   let l:command .= ' 1>'.l:tmps[0].' 2>'.l:tmps[1]
   let l:res = [[], []]
-  if !exists('v:servername') || empty(v:servername)
+  if has("nvim")
+    " Try to make the most use of Neovim job control.
+    " Neovim will not freeze when it handles large codebase projects.
+    let l:nvimcmd = printf("%s -fsyntax-only -Xclang -code-completion-macros -Xclang -code-completion-at=%s:%d:%d %s %s",
+                        \ g:clang_exec, l:src, a:line, a:col, a:clang_options, l:src)
+    call s:PDebug("s:ClangExecute::cmd", l:nvimcmd, 2)
+
+    " prevent s:DeleteAfterReadTmps l:res[index], index error
+    call writefile([], l:tmps[0])
+    call writefile([], l:tmps[1])
+    
+    let l:argv = ['sh', '-c', l:nvimcmd]
+    call s:PDebug("s:ClangExecute::job.argv", l:argv, 2)
+
+    let l:runclang = jobstart(l:argv, extend({'fstdout': l:tmps[0], 'fstderr': l:tmps[1]}, s:neojobcallbacks))
+    call s:PDebug("s:ClangExecute::job.status", "jobstart", 2)
+
+  elseif !exists('v:servername') || empty(v:servername)
     let b:clang_state['state'] = 'ready'
     call s:PDebug("s:ClangExecute::cmd", l:command, 2)
     call system(l:command)
