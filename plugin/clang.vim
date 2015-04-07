@@ -841,12 +841,42 @@ func! s:ClangCompleteInit(force)
 endf
 "}}}
 "{{{ ClangExecuteNeoJobHandler
-"handles event: exit
+"Handles events: stdout, stderr, exit
+"Tmps in memory
 func! ClangExecuteNeoJobHandler(job_id, data, event)
-  if a:event == 'exit'
-    call ClangExecuteDone(self.fstdout, self.fstderr)
+  if a:event == 'stdout'
+    " Remove needless newline
+    let l:line = a:data[len(a:data)-1]
+    if l:line == ''
+      let l:xdata = remove(a:data, len(a:data)-1)
+    endif
+    " Match COMPLETION"
+    let l:line = a:data[0]
+    let l:completiondx = stridx(l:line, "C", 0)
+    if l:completiondx != 0
+      let l:memtmplen = len(b:clang_memtmps[0])
+      let b:clang_memtmps[0][l:memtmplen-1] .= l:line
+      let l:xdata = remove(a:data, 0)
+    endif
+    let b:clang_memtmps[0] += a:data
+  elseif a:event == 'stderr'
+    "TODO: Handles complex error info
+    let l:datalen = len(a:data)
+    " Remove needless newline
+    let l:xdata = remove(a:data, l:datalen-1)
+    let b:clang_memtmps[1] += a:data
+  else
+    call ClangExecuteDone('', '')
   endif
 endf
+"}}}
+"{{{ s:neojobcallbacks
+"callbacks should be a global var.
+let s:neojobcallbacks = {
+\ 'on_stdout': function('ClangExecuteNeoJobHandler'),
+\ 'on_stderr': function('ClangExecuteNeoJobHandler'),
+\ 'on_exit': function('ClangExecuteNeoJobHandler')
+\ }
 "}}}
 "{{{ s:ClangExecute
 " Execute clang binary to generate completions and diagnostics.
@@ -869,15 +899,17 @@ func! s:ClangExecute(root, clang_options, line, col)
   let l:cwd = fnameescape(getcwd())
   exe 'lcd ' . a:root
   let l:src = shellescape(expand('%:p:.'))
-  let l:command = printf('%s -fsyntax-only -Xclang -code-completion-macros -Xclang -code-completion-at=%s:%d:%d %s %s',
+  let l:command_pure = printf('%s -fsyntax-only -Xclang -code-completion-macros -Xclang -code-completion-at=%s:%d:%d %s %s',
                       \ g:clang_exec, l:src, a:line, a:col, a:clang_options, l:src)
   let l:tmps = [tempname(), tempname()]
-  let l:command .= ' 1>'.l:tmps[0].' 2>'.l:tmps[1]
+  let l:command = l:command_pure.' 1>'.l:tmps[0].' 2>'.l:tmps[1]
   let l:res = [[], []]
   if has("nvim")
-    let l:argv = ['sh', '-c', l:command]
+    let l:argv = ['sh', '-c', l:command_pure]
     call s:PDebug("s:ClangExecute::job.argv", l:argv, 2)
-    call jobstart(l:argv, {'fstdout': l:tmps[0], 'fstderr': l:tmps[1], 'on_exit': function('ClangExecuteNeoJobHandler')})
+    let b:clang_memtmps = [[],[]]
+    call jobstart(l:argv, s:neojobcallbacks)
+    call s:PDebug("s:ClangExecute::job.status", "start", 2)
   elseif !exists('v:servername') || empty(v:servername)
     let b:clang_state['state'] = 'ready'
     call s:PDebug("s:ClangExecute::cmd", l:command, 2)
@@ -912,7 +944,11 @@ endf
 "       'stderr':  // updated in async mode
 "     }
 func! ClangExecuteDone(tmp1, tmp2)
-  let l:res = s:DeleteAfterReadTmps([a:tmp1, a:tmp2])
+  if has("nvim")
+    let l:res = b:clang_memtmps
+  else
+    let l:res = s:DeleteAfterReadTmps([a:tmp1, a:tmp2])
+  endif
   let b:clang_state['state'] = 'sync'
   let b:clang_state['stdout'] = l:res[0]
   let b:clang_state['stderr'] = l:res[1]
