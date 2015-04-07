@@ -116,8 +116,10 @@ endif
 au FileType c,cpp call <SID>ClangCompleteInit(0)
 "}}}
 "{{{ s:IsValidFile
+" A new file is also a valid file
 func! s:IsValidFile()
-  return ( &filetype == "c" || &filetype == "cpp" ) && filereadable(expand("%"))
+  let l:cur = expand("%")
+  return ( &filetype == "c" || &filetype == "cpp" ) && ( filereadable(l:cur) || empty(glob(l:cur)) )
 endf
 "}}}
 "{{{ s:PDebug
