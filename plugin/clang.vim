@@ -152,6 +152,22 @@ func! s:PLog(head, info)
   echom printf("Clang: log: %s >>> %s", string(a:head), string(a:info))
 endf
 "}}}
+"{{{ s:PDumpfile
+"@data list
+"@filename string
+func! s:PDumpfile(data, filename)
+  let l:lv = 5
+  let l:is_windows = has('win32') || has('win64')
+  if l:lv <= g:clang_debug && !l:is_windows
+    let l:fn = a:filename
+    if l:fn == ''
+      let l:fn = 'vim-clang-debug.log'
+    endif
+    let l:fullpath = '/tmp/'.l:fn
+    call writefile(a:data, l:fullpath)
+  endif
+endf
+"}}}
 " {{{ s:BufVarSet
 " Store current global var into b:clang_bufvars_storage
 " Set global options that different in different buffer
@@ -867,6 +883,8 @@ func! ClangExecuteNeoJobHandler(job_id, data, event)
     let b:clang_memtmps[1] += a:data
   else
     call ClangExecuteDone('', '')
+    call s:PDumpfile(b:clang_memtmps[0], "vim-clang-stdout-debug.log")
+    call s:PDumpfile(b:clang_memtmps[1], "vim-clang-stderr-debug.log")
   endif
 endf
 "}}}
