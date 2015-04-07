@@ -838,6 +838,19 @@ func! s:ClangCompleteInit(force)
   call s:GlobalVarRestore(l:gvars)
 endf
 "}}}
+"{{{ ClangExecuteNeoJobHandler
+"handles event: exit
+func! ClangExecuteNeoJobHandler(job_id, data, event)
+  if a:event == 'exit'  
+    call ClangExecuteDone(self.fstdout, self.fstderr)
+  endif
+endf
+"}}}
+"{{{ s:neojobcallbacks
+let s:neojobcallbacks = {
+\ 'on_exit': function('ClangExecuteNeoJobHandler')
+\ }
+"}}}
 "{{{ s:ClangExecute
 " Execute clang binary to generate completions and diagnostics.
 " Global variable:
@@ -864,7 +877,12 @@ func! s:ClangExecute(root, clang_options, line, col)
   let l:tmps = [tempname(), tempname()]
   let l:command .= ' 1>'.l:tmps[0].' 2>'.l:tmps[1]
   let l:res = [[], []]
-  if !exists('v:servername') || empty(v:servername)
+  if has("nvim")
+    let l:argv = ['sh', '-c', l:command]
+    call s:PDebug("s:ClangExecute::job.argv", l:argv, 2)
+    let l:runclang = jobstart(l:argv, extend({'fstdout': l:tmps[0], 'fstderr': l:tmps[1]}, s:neojobcallbacks))
+    call s:PDebug("s:ClangExecute::job.status", "jobstart", 2)
+  elseif !exists('v:servername') || empty(v:servername)
     let b:clang_state['state'] = 'ready'
     call s:PDebug("s:ClangExecute::cmd", l:command, 2)
     call system(l:command)
