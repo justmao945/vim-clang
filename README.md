@@ -80,6 +80,9 @@ find that's too 'slow' to wait the completion...
   can start Gvim to work as a server or you must add '--servername XXX' to force to start
   a vim server. More to see ':h clientserver'.
 
+* Job control is used to run clang when in neovim, which is really very nice! Thank you 
+  [syswow][6].
+
 
 Options and Commands
 --------------------
@@ -95,3 +98,4 @@ Now only tested on Linux (Ubuntu/Debian) and Mac OSX
 [3]: http://www.ishani.org/web/articles/code/clang-win32/
 [4]: https://github.com/tpope/vim-pathogen
 [5]: https://github.com/Valloric/YouCompleteMe
+[6]: https://github.com/syswow

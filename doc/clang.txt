@@ -216,6 +216,28 @@ A: Diagnostics window will be opened automatically when some errors occured
 
 ==============================================================================
 CHANGELOG                                        *clang-changelog*
+0.3
+* support job control for neovim [syswow]
+
+0.2.8
+* bug fix on var set and restore
+* refactor DiagnosticsWIndowClose
+
+0.2.7
+* fix restore global var when call ClangComplete
+
+0.2.6
+* import include path from &path [thawk]
+* do not initialize plugin for non readable files [jreybert]
+* fix "can't remove clang warning #16" issue [jreybert]
+* add an option to load vim-clang only if .clang file is found [jreybert]
+
+0.2.5
+* update doc
+
+0.2.4
+* ?
+
 0.23
 * Add g:clang_c_completeopt and g:clang_cpp_completeopt
 * Add g:clang_include_sysheaders
@@ -247,6 +269,7 @@ Thanks to following people for suggestions and patches:
 * yuquan23459
 * adelarsq
 * jreybert
+* syswow
 
 ==============================================================================
 vim:tw=78:ts=8:ft=help:norl
