@@ -497,15 +497,9 @@ endf
 func! s:GlobalVarSet()
   let l:values = {
       \ 'shell':        &shell,
-      \ 'completeopt':  &completeopt,
   \ }
   if !empty(g:clang_sh_exec)
     exe 'set shell='.g:clang_sh_exec
-  endif
-  if &filetype == 'c' && !empty(g:clang_c_completeopt)
-    exe 'set completeopt='.g:clang_c_completeopt
-  elseif &filetype == 'cpp' && !empty(g:clang_cpp_completeopt)
-    exe 'set completeopt='.g:clang_cpp_completeopt
   endif
   return l:values
 endf
@@ -518,7 +512,6 @@ func! s:GlobalVarRestore(values)
     return
   endif
   exe 'set shell='.a:values['shell']
-  exe 'set completeopt='.a:values['completeopt']
 endf
 " }}}
 " {{{ s:HasPreviewAbove
