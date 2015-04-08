@@ -868,9 +868,9 @@ endf
 func! s:ClangExecute(root, clang_options, line, col)
   let l:cwd = fnameescape(getcwd())
   exe 'lcd ' . a:root
-  let l:src = shellescape(expand('%:p:.'))
-  let l:command = printf('%s -fsyntax-only -Xclang -code-completion-macros -Xclang -code-completion-at=%s:%d:%d %s %s',
-                      \ g:clang_exec, l:src, a:line, a:col, a:clang_options, l:src)
+  let l:src = join(getline(1, '$'), "\n") . "\n"
+  let l:command = printf('%s -fsyntax-only -Xclang -code-completion-macros -Xclang -code-completion-at=-:%d:%d %s -',
+                      \ g:clang_exec, a:line, a:col, a:clang_options)
   let l:tmps = [tempname(), tempname()]
   let l:command .= ' 1>'.l:tmps[0].' 2>'.l:tmps[1]
   let l:res = [[], []]
@@ -881,7 +881,7 @@ func! s:ClangExecute(root, clang_options, line, col)
   elseif !exists('v:servername') || empty(v:servername)
     let b:clang_state['state'] = 'ready'
     call s:PDebug("s:ClangExecute::cmd", l:command, 2)
-    call system(l:command)
+    call system(l:command, l:src)
     let l:res = s:DeleteAfterReadTmps(l:tmps)
     call s:PDebug("s:ClangExecute::stdout", l:res[0], 3)
     call s:PDebug("s:ClangExecute::stderr", l:res[1], 2)
@@ -894,7 +894,7 @@ func! s:ClangExecute(root, clang_options, line, col)
                       \ g:clang_vim_exec, shellescape(v:servername), shellescape(l:keys))
     let l:command = '('.l:command.';'.l:vcmd.') &'
     call s:PDebug("s:ClangExecute::cmd", l:command, 2)
-    call system(l:command)
+    call system(l:command, l:src)
   endif
   exe 'lcd ' . l:cwd
   let b:clang_state['stdout'] = l:res[0]
@@ -998,8 +998,6 @@ func! s:ClangComplete(findstart, base)
       " update state machine
       if b:clang_state['state'] == 'ready'
         let b:clang_state['state'] = 'busy'
-        " buggy when update in the second phase ?
-        silent update!
         call s:ClangExecute(b:clang_root, b:clang_options, l:line, l:col)
       elseif b:clang_state['state'] == 'sync'
         let b:clang_state['state'] = 'ready'
