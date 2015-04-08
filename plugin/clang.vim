@@ -861,27 +861,36 @@ endf
 "Tmps in memory
 func! ClangExecuteNeoJobHandler(job_id, data, event)
   if a:event == 'stdout'
-    " Remove needless newline
-    let l:line = a:data[len(a:data)-1]
-    if l:line == ''
-      let l:xdata = remove(a:data, len(a:data)-1)
-    endif
-    " Match COMPLETION"
-    let l:line = a:data[0]
-    let l:completiondx = stridx(l:line, "C", 0)
-    if l:completiondx != 0
-      let l:memtmplen = len(b:clang_memtmps[0])
-      let b:clang_memtmps[0][l:memtmplen-1] .= l:line
-      let l:xdata = remove(a:data, 0)
+    if len(b:clang_memtmps[0]) != 0
+      if b:clang_memtmps[0][-1] == ''
+        call remove(b:clang_memtmps[0], -1)
+      else
+        let line = a:data[0]
+        let b:clang_memtmps[0][-1] .= line
+        call remove(a:data, 0)
+      endif
     endif
     let b:clang_memtmps[0] += a:data
+
   elseif a:event == 'stderr'
-    "TODO: Handles complex error info
-    let l:datalen = len(a:data)
-    " Remove needless newline
-    let l:xdata = remove(a:data, l:datalen-1)
+    if len(b:clang_memtmps[1]) != 0
+      if b:clang_memtmps[1][-1] == ''
+        call remove(b:clang_memtmps[1], -1)
+      else
+        let line = a:data[0]
+        let b:clang_memtmps[1][-1] .= line
+        call remove(a:data, 0)
+      endif
+    endif
     let b:clang_memtmps[1] += a:data
+
   else
+    if len(b:clang_memtmps[0]) != 0 && b:clang_memtmps[0][-1] == ''
+      call remove(b:clang_memtmps[0], -1)
+    endif
+    if len(b:clang_memtmps[1]) != 0 && b:clang_memtmps[1][-1] == ''
+      call remove(b:clang_memtmps[1], -1)
+    endif
     call ClangExecuteDone('', '')
     call s:PDumpfile(b:clang_memtmps[0], "vim-clang-stdout-debug.log")
     call s:PDumpfile(b:clang_memtmps[1], "vim-clang-stderr-debug.log")
