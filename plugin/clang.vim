@@ -293,9 +293,10 @@ endf
 "   t:clang_diags_bufnr         <= diagnostics window bufnr
 "   t:clang_diags_driver_bufnr  <= the driver buffer number, who opens this window
 "   NOTE: Don't use winnr, winnr maybe changed.
+" @src Relative path to current source file, to replace <stdin>
 " @diags A list of lines from clang diagnostics, or a diagnostics file name.
 " @return -1 or buffer number t:clang_diags_bufnr
-func! s:DiagnosticsWindowOpen(diags)
+func! s:DiagnosticsWindowOpen(src, diags)
   let l:diags = a:diags
   if type(l:diags) == type('')
     " diagnostics file name
@@ -351,7 +352,7 @@ func! s:DiagnosticsWindowOpen(diags)
 
   " add diagnostics
   for l:line in l:diags
-    call append(line('$')-1, l:line)
+    call append(line('$')-1, substitute(l:line, '<stdin>', a:src, 'g'))
   endfor
   " the last empty line
   $delete _
@@ -479,7 +480,7 @@ func! s:GenPCH(clang, header)
 
   if v:shell_error
     " uses internal diag window to show errors
-    call s:DiagnosticsWindowOpen(split(l:clang_output, '\n'))
+    call s:DiagnosticsWindowOpen(expand('%:p:.'), split(l:clang_output, '\n'))
     call s:PDebug("s:GenPCH", {'exit': v:shell_error, 'cmd': l:command, 'out': l:clang_output }, 3)
   else
     " may want to discover pch
@@ -1015,7 +1016,7 @@ func! s:ClangComplete(findstart, base)
       pclose
     endif
     " call to show diagnostics
-    call s:DiagnosticsWindowOpen(b:clang_cache['diagnostics'])
+    call s:DiagnosticsWindowOpen(expand('%:p:.'), b:clang_cache['diagnostics'])
     return l:start
   else
     call s:PDebug("ClangComplete", "phase 2")
