@@ -861,6 +861,7 @@ endf
 "Tmps in memory
 func! ClangExecuteNeoJobHandler(job_id, data, event)
   if a:event == 'stdout'
+    call s:PDebug("ClangExecuteNeoJobHandler", "stdout", 2)
     if len(b:clang_memtmps[0]) != 0
       if b:clang_memtmps[0][-1] == ''
         call remove(b:clang_memtmps[0], -1)
@@ -873,6 +874,7 @@ func! ClangExecuteNeoJobHandler(job_id, data, event)
     let b:clang_memtmps[0] += a:data
 
   elseif a:event == 'stderr'
+    call s:PDebug("ClangExecuteNeoJobHandler", "stderr", 2)
     if len(b:clang_memtmps[1]) != 0
       if b:clang_memtmps[1][-1] == ''
         call remove(b:clang_memtmps[1], -1)
@@ -885,6 +887,7 @@ func! ClangExecuteNeoJobHandler(job_id, data, event)
     let b:clang_memtmps[1] += a:data
 
   else
+    call s:PDebug("ClangExecuteNeoJobHandler", "exit", 2)
     if len(b:clang_memtmps[0]) != 0 && b:clang_memtmps[0][-1] == ''
       call remove(b:clang_memtmps[0], -1)
     endif
@@ -926,17 +929,26 @@ func! s:ClangExecute(root, clang_options, line, col)
   let l:cwd = fnameescape(getcwd())
   exe 'lcd ' . a:root
   let l:src = shellescape(expand('%:p:.'))
-  let l:command_pure = printf('%s -fsyntax-only -Xclang -code-completion-macros -Xclang -code-completion-at=%s:%d:%d %s %s',
+  let l:command = printf('%s -fsyntax-only -Xclang -code-completion-macros -Xclang -code-completion-at=%s:%d:%d %s %s',
                       \ g:clang_exec, l:src, a:line, a:col, a:clang_options, l:src)
   let l:tmps = [tempname(), tempname()]
-  let l:command = l:command_pure.' 1>'.l:tmps[0].' 2>'.l:tmps[1]
+  let l:command .= ' 1>'.l:tmps[0].' 2>'.l:tmps[1]
   let l:res = [[], []]
   if has("nvim")
-    let l:argv = ['sh', '-c', l:command_pure]
-    call s:PDebug("s:ClangExecute::job.argv", l:argv, 2)
     let b:clang_memtmps = [[],[]]
-    call jobstart(l:argv, s:neojobcallbacks)
-    call s:PDebug("s:ClangExecute::job.status", "start", 2)
+
+    let l:nvimsrc = getline(1, '$')
+    call add(l:nvimsrc, "\<cr>")
+
+    let l:linecol = printf("-:%d:%d", a:line, a:col)
+    let l:argv = ['clang', '-cc1', '-fsyntax-only', '-code-completion-macros']
+    let l:argv += split(a:clang_options, ' ')
+    let l:argv += ['-code-completion-at', l:linecol]
+
+    let l:jobid = jobstart(l:argv, s:neojobcallbacks)
+    call jobsend(l:jobid, l:nvimsrc)
+    call jobclose(l:jobid, 'stdin')
+
   elseif !exists('v:servername') || empty(v:servername)
     let b:clang_state['state'] = 'ready'
     call s:PDebug("s:ClangExecute::cmd", l:command, 2)
