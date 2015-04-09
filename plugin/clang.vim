@@ -352,7 +352,7 @@ func! s:DiagnosticsWindowOpen(src, diags)
 
   " add diagnostics
   for l:line in l:diags
-    call append(line('$')-1, substitute(l:line, '<stdin>', a:src, 'g'))
+    call append(line('$')-1, substitute(l:line, '^<stdin>:', a:src . ':', ''))
   endfor
   " the last empty line
   $delete _
