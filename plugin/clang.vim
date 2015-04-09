@@ -940,12 +940,12 @@ func! s:ClangExecute(root, clang_options, line, col)
     let l:nvimsrc = getline(1, '$')
     call add(l:nvimsrc, "\<cr>")
 
-    let l:linecol = printf("-:%d:%d", a:line, a:col)
-    let l:argv = ['clang', '-cc1', '-fsyntax-only', '-code-completion-macros']
-    let l:argv += split(a:clang_options, ' ')
-    let l:argv += ['-code-completion-at', l:linecol]
+    let l:nvimcmd = printf('%s -cc1 -x c++ -fsyntax-only -code-completion-macros -code-completion-at -:%d:%d %s',
+                      \ g:clang_exec, a:line, a:col, a:clang_options)
+    let l:argv = l:nvimcmd
 
-    let l:jobid = jobstart(l:argv, s:neojobcallbacks)
+    " set env
+    let l:jobid = jobstart(['sh', '-c', l:argv], s:neojobcallbacks)
     call jobsend(l:jobid, l:nvimsrc)
     call jobclose(l:jobid, 'stdin')
 
