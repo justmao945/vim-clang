@@ -756,6 +756,9 @@ func! s:ClangCompleteInit(force)
     endif
   endif
   
+  " add current dir to include path
+  let b:clang_options .= ' -I ' . expand("%:p:h")
+
   " add include directories if is enabled and not ow
   if g:clang_include_sysheaders && ! l:is_ow
     let l:incs = s:DiscoverIncludeDirs(g:clang_exec, b:clang_options)
