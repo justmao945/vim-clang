@@ -426,7 +426,7 @@ func! s:DiagnosticsWindowClose(when_bufwinleave)
   exe l:dwn . 'wincmd w'
   if a:when_bufwinleave && winbufnr(3) == -1
     " quit editor when called before leave the driver window
-    qa!
+    qall!
   else
     " just hide the diag window
     hide
@@ -830,7 +830,9 @@ func! s:ClangCompleteInit(force)
           \ endif
   endif
 
-  au BufWinLeave <buffer> call <SID>DiagnosticsPreviewWindowClose(1)
+  "FIXME buggy when use :e, see #41
+  "au BufWinLeave <buffer> call <SID>DiagnosticsPreviewWindowClose(1)
+
   au BufEnter <buffer> call <SID>BufVarSet()
   au BufLeave <buffer> call <SID>BufVarRestore()
 
