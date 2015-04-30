@@ -215,7 +215,9 @@ A: Diagnostics window will be opened automatically when some errors occured
    in your source code, and dismissed when they are fixed or change buffers.
 
 Q: Why write file to disk when do completion ?
-A: Because the external code completion engine clang need to read the latest
+A: If you use Neovim, then vim-clang don't need to write file to disk when do
+   completion, but if you use vim, vim-clang still need to accesses disk.
+   Because the external code completion engine clang need to read the latest
    code to do the completion, so it must have some file to read, here is our
    source file. Can we write to temp file instead ? This is an alternative, 
    but still need a lot of things to do.

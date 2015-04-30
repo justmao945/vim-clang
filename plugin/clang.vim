@@ -152,6 +152,22 @@ func! s:PLog(head, info)
   echom printf("Clang: log: %s >>> %s", string(a:head), string(a:info))
 endf
 "}}}
+"{{{ s:PDumpfile
+"@data list
+"@filename string
+func! s:PDumpfile(data, filename)
+  let l:lv = 5
+  let l:is_windows = has('win32') || has('win64')
+  if l:lv <= g:clang_debug && !l:is_windows
+    let l:fn = a:filename
+    if l:fn == ''
+      let l:fn = 'vim-clang-debug.log'
+    endif
+    let l:fullpath = '/tmp/'.l:fn
+    call writefile(a:data, l:fullpath)
+  endif
+endf
+"}}}
 " {{{ s:BufVarSet
 " Store current global var into b:clang_bufvars_storage
 " Set global options that different in different buffer
@@ -840,12 +856,56 @@ func! s:ClangCompleteInit(force)
 endf
 "}}}
 "{{{ ClangExecuteNeoJobHandler
-"handles event: exit
+"Handles events: stdout, stderr, exit
+"Tmps in memory
 func! ClangExecuteNeoJobHandler(job_id, data, event)
-  if a:event == 'exit'
-    call ClangExecuteDone(self.fstdout, self.fstderr)
+  if a:event == 'stdout'
+    call s:PDebug("ClangExecuteNeoJobHandler", "stdout", 2)
+    if len(b:clang_memtmps[0]) != 0
+      if b:clang_memtmps[0][-1] == ''
+        call remove(b:clang_memtmps[0], -1)
+      else
+        let line = a:data[0]
+        let b:clang_memtmps[0][-1] .= line
+        call remove(a:data, 0)
+      endif
+    endif
+    let b:clang_memtmps[0] += a:data
+
+  elseif a:event == 'stderr'
+    call s:PDebug("ClangExecuteNeoJobHandler", "stderr", 2)
+    if len(b:clang_memtmps[1]) != 0
+      if b:clang_memtmps[1][-1] == ''
+        call remove(b:clang_memtmps[1], -1)
+      else
+        let line = a:data[0]
+        let b:clang_memtmps[1][-1] .= line
+        call remove(a:data, 0)
+      endif
+    endif
+    let b:clang_memtmps[1] += a:data
+
+  else
+    call s:PDebug("ClangExecuteNeoJobHandler", "exit", 2)
+    if len(b:clang_memtmps[0]) != 0 && b:clang_memtmps[0][-1] == ''
+      call remove(b:clang_memtmps[0], -1)
+    endif
+    if len(b:clang_memtmps[1]) != 0 && b:clang_memtmps[1][-1] == ''
+      call remove(b:clang_memtmps[1], -1)
+    endif
+    call ClangExecuteDone('', '')
+    call s:PDumpfile(b:clang_memtmps[0], "vim-clang-stdout-debug.log")
+    call s:PDumpfile(b:clang_memtmps[1], "vim-clang-stderr-debug.log")
   endif
 endf
+"}}}
+"{{{ s:neojobcallbacks
+"callbacks should be a global var.
+let s:neojobcallbacks = {
+\ 'on_stdout': function('ClangExecuteNeoJobHandler'),
+\ 'on_stderr': function('ClangExecuteNeoJobHandler'),
+\ 'on_exit': function('ClangExecuteNeoJobHandler')
+\ }
 "}}}
 "{{{ s:ClangExecute
 " Execute clang binary to generate completions and diagnostics.
@@ -874,9 +934,20 @@ func! s:ClangExecute(root, clang_options, line, col)
   let l:command .= ' 1>'.l:tmps[0].' 2>'.l:tmps[1]
   let l:res = [[], []]
   if has("nvim")
-    let l:argv = ['sh', '-c', l:command]
-    call s:PDebug("s:ClangExecute::job.argv", l:argv, 2)
-    call jobstart(l:argv, {'fstdout': l:tmps[0], 'fstderr': l:tmps[1], 'on_exit': function('ClangExecuteNeoJobHandler')})
+    let b:clang_memtmps = [[],[]]
+
+    let l:nvimsrc = getline(1, '$')
+    call add(l:nvimsrc, "\<cr>")
+
+    let l:nvimcmd = printf('%s -cc1 -x c++ -fsyntax-only -code-completion-macros -code-completion-at -:%d:%d %s',
+                      \ g:clang_exec, a:line, a:col, a:clang_options)
+    let l:argv = l:nvimcmd
+
+    " set env
+    let l:jobid = jobstart(['sh', '-c', l:argv], s:neojobcallbacks)
+    call jobsend(l:jobid, l:nvimsrc)
+    call jobclose(l:jobid, 'stdin')
+
   elseif !exists('v:servername') || empty(v:servername)
     let b:clang_state['state'] = 'ready'
     call s:PDebug("s:ClangExecute::cmd", l:command, 2)
@@ -911,7 +982,11 @@ endf
 "       'stderr':  // updated in async mode
 "     }
 func! ClangExecuteDone(tmp1, tmp2)
-  let l:res = s:DeleteAfterReadTmps([a:tmp1, a:tmp2])
+  if has("nvim")
+    let l:res = b:clang_memtmps
+  else
+    let l:res = s:DeleteAfterReadTmps([a:tmp1, a:tmp2])
+  endif
   let b:clang_state['state'] = 'sync'
   let b:clang_state['stdout'] = l:res[0]
   let b:clang_state['stderr'] = l:res[1]
