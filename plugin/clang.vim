@@ -698,8 +698,14 @@ func! s:ClangCompleteInit(force)
   let l:cwd = fnameescape(getcwd())
   let l:fwd = fnameescape(expand('%:p:h'))
   exe 'lcd ' . l:fwd
-  let l:dotclang    = findfile(g:clang_dotfile, '.;')
-  let l:dotclangow  = findfile(g:clang_dotfile_overwrite, '.;')
+  let l:dotclang = findfile(g:clang_dotfile, '.;')
+  if l:dotclang == g:clang_dotfile
+    let l:dotclang = l:fwd.'/'.l:dotclang
+  endif
+  let l:dotclangow = findfile(g:clang_dotfile_overwrite, '.;')
+  if l:dotclangow == g:clang_dotfile_overwrite
+    let l:dotclangow = l:fwd.'/'.l:dotclangow
+  endif
   exe 'lcd '.l:cwd
 
   let l:has_dotclang = strlen(l:dotclang) + strlen(l:dotclangow)
@@ -840,10 +846,40 @@ func! s:ClangCompleteInit(force)
 endf
 "}}}
 "{{{ ClangExecuteNeoJobHandler
-"handles event: exit
+"Handles events: stdout, stderr, exit
 func! ClangExecuteNeoJobHandler(job_id, data, event)
-  if a:event == 'exit'
-    call ClangExecuteDone(self.fstdout, self.fstderr)
+  if a:event == 'stdout'
+    if len(b:clang_state['stdout']) != 0
+      if b:clang_state['stdout'][-1] == ''
+        call remove(b:clang_state['stdout'], -1)
+      else
+        let line = a:data[0]
+        let b:clang_state['stdout'][-1] .= line
+        call remove(a:data, 0)
+      endif
+    endif
+    let b:clang_state['stdout'] += a:data
+
+  elseif a:event == 'stderr'
+    if len(b:clang_state['stderr']) != 0
+      if b:clang_state['stderr'][-1] == ''
+        call remove(b:clang_state['stderr'], -1)
+      else
+        let line = a:data[0]
+        let b:clang_state['stderr'][-1] .= line
+        call remove(a:data, 0)
+      endif
+    endif
+    let b:clang_state['stderr'] += a:data
+
+  else
+    if len(b:clang_state['stdout']) != 0 && b:clang_state['stdout'][-1] == ''
+      call remove(b:clang_state['stdout'], -1)
+    endif
+    if len(b:clang_state['stderr']) != 0 && b:clang_state['stderr'][-1] == ''
+      call remove(b:clang_state['stderr'], -1)
+    endif
+    call ClangExecuteDone('', '')
   endif
 endf
 "}}}
@@ -874,9 +910,16 @@ func! s:ClangExecute(root, clang_options, line, col)
   let l:command .= ' 1>'.l:tmps[0].' 2>'.l:tmps[1]
   let l:res = [[], []]
   if has("nvim")
-    let l:argv = ['sh', '-c', l:command]
-    call s:PDebug("s:ClangExecute::job.argv", l:argv, 2)
-    call jobstart(l:argv, {'fstdout': l:tmps[0], 'fstderr': l:tmps[1], 'on_exit': function('ClangExecuteNeoJobHandler')})
+    let l:nvimsrc = getline(1, '$')
+    call add(l:nvimsrc, "\<cr>")
+    let l:argv = printf('%s -cc1 -x c++ -fsyntax-only -code-completion-macros -code-completion-at -:%d:%d %s',
+                      \ g:clang_exec, a:line, a:col, a:clang_options)
+    let l:jobid = jobstart(['sh', '-c', l:argv], {
+        \ 'on_stdout': function('ClangExecuteNeoJobHandler'),
+        \ 'on_stderr': function('ClangExecuteNeoJobHandler'),
+        \ 'on_exit': function('ClangExecuteNeoJobHandler')})
+    call jobsend(l:jobid, l:nvimsrc)
+    call jobclose(l:jobid, 'stdin')
   elseif !exists('v:servername') || empty(v:servername)
     let b:clang_state['state'] = 'ready'
     call s:PDebug("s:ClangExecute::cmd", l:command, 2)
@@ -911,16 +954,18 @@ endf
 "       'stderr':  // updated in async mode
 "     }
 func! ClangExecuteDone(tmp1, tmp2)
-  let l:res = s:DeleteAfterReadTmps([a:tmp1, a:tmp2])
+  if !has("nvim")
+    let l:res = s:DeleteAfterReadTmps([a:tmp1, a:tmp2])
+    let b:clang_state['stdout'] = l:res[0]
+    let b:clang_state['stderr'] = l:res[1]
+    call s:PDebug("ClangExecuteDone::stdout", l:res[0], 3)
+    call s:PDebug("ClangExecuteDone::stderr", l:res[1], 2)
+  endif
   let b:clang_state['state'] = 'sync'
-  let b:clang_state['stdout'] = l:res[0]
-  let b:clang_state['stderr'] = l:res[1]
-  call s:PDebug("ClangExecuteDone::stdout", l:res[0], 3)
-  call s:PDebug("ClangExecuteDone::stderr", l:res[1], 2)
   call feedkeys("\<Esc>a")
   " As the default action of <C-x><C-o> causes a 'pattern not found'
   " when the result is empty, which break our input, that's really painful...
-  if ! empty(l:res[0])
+  if ! empty(b:clang_state['stdout'])
     call feedkeys("\<C-x>\<C-o>")
   else
     call ClangComplete(0, ClangComplete(1, 0))
