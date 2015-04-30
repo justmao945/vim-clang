@@ -698,8 +698,14 @@ func! s:ClangCompleteInit(force)
   let l:cwd = fnameescape(getcwd())
   let l:fwd = fnameescape(expand('%:p:h'))
   exe 'lcd ' . l:fwd
-  let l:dotclang    = findfile(g:clang_dotfile, '.;')
-  let l:dotclangow  = findfile(g:clang_dotfile_overwrite, '.;')
+  let l:dotclang = findfile(g:clang_dotfile, '.;')
+  if l:dotclang == g:clang_dotfile
+    let l:dotclang = l:fwd.'/'.l:dotclang
+  endif
+  let l:dotclangow = findfile(g:clang_dotfile_overwrite, '.;')
+  if l:dotclangow == g:clang_dotfile_overwrite
+    let l:dotclangow = l:fwd.'/'.l:dotclangow
+  endif
   exe 'lcd '.l:cwd
 
   let l:has_dotclang = strlen(l:dotclang) + strlen(l:dotclangow)
