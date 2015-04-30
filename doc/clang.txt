@@ -222,9 +222,11 @@ A: Because the external code completion engine clang need to read the latest
 
 ==============================================================================
 CHANGELOG                                        *clang-changelog*
-0.3
+0.3.0
 * support job control for neovim [syswow]
+* no need to write source file to disk before completion [mlen]
 * fix init plugin when create new file
+* bug fix
 
 0.2.8
 * bug fix on var set and restore
@@ -277,6 +279,7 @@ Thanks to following people for suggestions and patches:
 * adelarsq
 * jreybert
 * syswow
+* mlen
 
 ==============================================================================
 vim:tw=78:ts=8:ft=help:norl
