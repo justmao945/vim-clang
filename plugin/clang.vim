@@ -796,7 +796,10 @@ func! s:ClangCompleteInit(force)
   com! ClangCloseWindow  call <SID>DiagnosticsPreviewWindowClose(0)
 
   " Useful to re-initialize plugin if .clang is changed
-  com! ClangCompleteInit            call <SID>ClangCompleteInit(1)
+  com! ClangCompleteInit call <SID>ClangCompleteInit(1)
+
+  " Useful to check syntax only
+  com! ClangSyntaxCheck call <SID>ClangSyntaxCheck(b:clang_root, b:clang_options)
 
   " try to find PCH files in clang_root and clang_root/include
   " Or add `-include-pch /path/to/x.h.pch` into the root file .clang manully
@@ -838,6 +841,9 @@ func! s:ClangCompleteInit(force)
 
   au BufEnter <buffer> call <SID>BufVarSet()
   au BufLeave <buffer> call <SID>BufVarRestore()
+
+  " auto check syntax when write buffer
+  au BufWritePost <buffer> ClangSyntaxCheck
 
   call s:GlobalVarRestore(l:gvars)
 endf
@@ -928,6 +934,25 @@ func! ClangExecuteDone(tmp1, tmp2)
   else
     call ClangComplete(0, ClangComplete(1, 0))
   endif
+endf
+" }}}
+" {{{ s:ClangSyntaxCheck
+" Only do syntax check without completion, will open diags window when have
+" problem. Now this function will block...
+func! s:ClangSyntaxCheck(root, clang_options)
+  let l:cwd = fnameescape(getcwd())
+  exe 'lcd ' . a:root
+  let l:src = join(getline(1, '$'), "\n")
+  let l:command = printf('%s -fsyntax-only %s -', g:clang_exec, a:clang_options)
+  call s:PDebug("ClangSyntaxCheck::command", l:command)
+  let l:clang_output = system(l:command, l:src)
+  call s:DiagnosticsWindowOpen(expand('%:p:.'), split(l:clang_output, '\n'))
+  exe 'lcd ' . l:cwd
+endf
+" }}}
+" {{{ s:ClangFormat
+" Call clang-format to format source code
+func! s:ClangFormat()
 endf
 " }}}
 "{{{ ClangComplete
