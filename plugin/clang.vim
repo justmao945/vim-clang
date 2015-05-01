@@ -51,6 +51,10 @@ if !exists('g:clang_auto')
   let g:clang_auto = 1
 endif
 
+if !exists('g:clang_format_auto')
+  let g:clang_format_auto = 0
+endif
+
 if !exists('g:clang_c_options')
   let g:clang_c_options = ''
 endif
@@ -78,6 +82,14 @@ endif
 if !exists('g:clang_exec')
   let g:clang_exec = 'clang'
 endif
+
+if !exists('g:clang_format_exec')
+  let g:clang_format_exec = 'clang-format'
+endif
+
+if !exists('g:clang_format_style')
+  let g:clang_format_style = 'LLVM'
+end
 
 if !exists('g:clang_include_sysheaders')
   let g:clang_include_sysheaders = 1
@@ -801,6 +813,9 @@ func! s:ClangCompleteInit(force)
   " Useful to check syntax only
   com! ClangSyntaxCheck call <SID>ClangSyntaxCheck(b:clang_root, b:clang_options)
 
+  " Useful to format source code
+  com! ClangFormat call <SID>ClangFormat('%')
+
   " try to find PCH files in clang_root and clang_root/include
   " Or add `-include-pch /path/to/x.h.pch` into the root file .clang manully
   if &filetype == 'cpp' && b:clang_options !~# '-include-pch'
@@ -844,6 +859,11 @@ func! s:ClangCompleteInit(force)
 
   " auto check syntax when write buffer
   au BufWritePost <buffer> ClangSyntaxCheck
+
+  " auto format current file if is enabled
+  if g:clang_format_auto
+    au BufWritePost <buffer> ClangFormat
+  end
 
   call s:GlobalVarRestore(l:gvars)
 endf
@@ -952,7 +972,9 @@ endf
 " }}}
 " {{{ s:ClangFormat
 " Call clang-format to format source code
-func! s:ClangFormat()
+func! s:ClangFormat(file)
+  let l:command = printf("%s -i -style=%s %s", g:clang_format_exec, g:clang_format_style, expand(a:file))
+  call system(l:command)
 endf
 " }}}
 "{{{ ClangComplete
