@@ -900,9 +900,9 @@ func! s:ClangExecute(root, clang_options, line, col)
     call s:PDebug("s:ClangExecute::cmd", l:command, 2)
 
     " try to force stop last job which doesn't exit.
-    if exists('b:jobid')
+    if exists('b:clang_execute_neojob_id')
       try
-        call jobstop(b:jobid)
+        call jobstop(b:clang_execute_neojob_id)
       catch
         " Ignore
       endtry
@@ -913,15 +913,15 @@ func! s:ClangExecute(root, clang_options, line, col)
         \ 'on_stdout': function('ClangExecuteNeoJobHandler'),
         \ 'on_stderr': function('ClangExecuteNeoJobHandler'),
         \ 'on_exit': function('ClangExecuteNeoJobHandler')}
-    let b:jobid = jobstart(l:argv, l:opts)
+    let b:clang_execute_neojob_id = jobstart(l:argv, l:opts)
 
-    if b:jobid > 0
-      call s:PDebug("s:ClangExecute::jobid", b:jobid, 2)
-      call jobsend(b:jobid, l:src)
-      call jobclose(b:jobid, 'stdin')
+    if b:clang_execute_neojob_id > 0
+      call s:PDebug("s:ClangExecute::jobid", b:clang_execute_neojob_id, 2)
+      call jobsend(b:clang_execute_neojob_id, l:src)
+      call jobclose(b:clang_execute_neojob_id, 'stdin')
     else
       call s:PError("s:ClangExecute", "Invalid jobid >> ".
-           \ (b:jobid < 0 ? "Invalid clang_sh_exec" : "Job table is full or invalid arguments"))
+           \ (b:clang_execute_neojob_id < 0 ? "Invalid clang_sh_exec" : "Job table is full or invalid arguments"))
     endif
   elseif !exists('v:servername') || empty(v:servername)
     let b:clang_state['state'] = 'ready'
