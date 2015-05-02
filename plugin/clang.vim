@@ -898,6 +898,7 @@ func! s:ClangExecute(root, clang_options, line, col)
     let l:command = printf('%s -cc1 -x c++ -fsyntax-only -code-completion-macros -code-completion-at -:%d:%d %s',
                       \ g:clang_exec, a:line, a:col, a:clang_options)
     call s:PDebug("s:ClangExecute::cmd", l:command, 2)
+
     " try to force stop last job which doesn't exit.
     if exists('b:jobid')
       try
@@ -906,15 +907,22 @@ func! s:ClangExecute(root, clang_options, line, col)
         " Ignore
       endtry
     endif
+
     let l:argv = [g:clang_sh_exec, '-c', l:command]
     let l:opts = {
         \ 'on_stdout': function('ClangExecuteNeoJobHandler'),
         \ 'on_stderr': function('ClangExecuteNeoJobHandler'),
         \ 'on_exit': function('ClangExecuteNeoJobHandler')}
     let b:jobid = jobstart(l:argv, l:opts)
-    call s:PDebug("s:ClangExecute::jobid", b:jobid, 2)
-    call jobsend(b:jobid, l:src)
-    call jobclose(b:jobid, 'stdin')
+
+    if b:jobid > 0
+      call s:PDebug("s:ClangExecute::jobid", b:jobid, 2)
+      call jobsend(b:jobid, l:src)
+      call jobclose(b:jobid, 'stdin')
+    else
+      call s:PError("s:ClangExecute", "Invalid jobid >> ".
+           \ (b:jobid < 0 ? "Invalid clang_sh_exec" : "Job table is full or invalid arguments"))
+    endif
   elseif !exists('v:servername') || empty(v:servername)
     let b:clang_state['state'] = 'ready'
     call s:PDebug("s:ClangExecute::cmd", l:command, 2)
