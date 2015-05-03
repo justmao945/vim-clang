@@ -869,10 +869,28 @@ func! s:ClangCompleteInit(force)
 endf
 "}}}
 "{{{ ClangExecuteNeoJobHandler
-"handles event: exit
+"Handles stdout/stderr/exit events, and stores the stdout/stderr received from the shells.
 func! ClangExecuteNeoJobHandler(job_id, data, event)
-  if a:event == 'exit'
-    call ClangExecuteDone(self.fstdout, self.fstderr)
+  if index(['stdout', 'stderr'], a:event) >= 0
+    " when a:data[-1] is empty, which means is a complete line, otherwise need to concat a:data[-1]
+    if !empty(b:clang_state[a:event])
+      if empty(b:clang_state[a:event][-1])
+        " a complete line, just remove the last empty line
+        call remove(b:clang_state[a:event], -1)
+      else
+        " need to concat to the last line in previous chunk
+        let b:clang_state[a:event][-1] .= a:data[0]
+        call remove(a:data, 0)
+      endif
+    endif
+    let b:clang_state[a:event] += a:data
+  elseif a:event == 'exit'
+    for stream in ['stdout', 'stderr']
+      if len(b:clang_state[stream]) != 0 && b:clang_state[stream][-1] == ''
+        call remove(b:clang_state[stream], -1)
+      endif
+    endfor
+    call s:ClangExecuteDoneTriggerCompletion()
   endif
 endf
 "}}}
@@ -888,6 +906,9 @@ endf
 "       'stdout':  // updated in sync mode
 "       'stderr':  // updated in sync mode
 "     }
+"
+"     b:clang_execute_neojob_id  // used to stop previous job
+"
 " @root Clang root, project directory
 " @clang_options Options appended to clang binary image
 " @line Line to complete
@@ -897,15 +918,39 @@ func! s:ClangExecute(root, clang_options, line, col)
   let l:cwd = fnameescape(getcwd())
   exe 'lcd ' . a:root
   let l:src = join(getline(1, '$'), "\n") . "\n"
-  let l:command = printf('%s -fsyntax-only -Xclang -code-completion-macros -Xclang -code-completion-at=-:%d:%d %s -',
+  " shorter version, without redirecting stdout and stderr
+  let l:cmd = printf('%s -fsyntax-only -Xclang -code-completion-macros -Xclang -code-completion-at=-:%d:%d %s -',
                       \ g:clang_exec, a:line, a:col, a:clang_options)
   let l:tmps = [tempname(), tempname()]
-  let l:command .= ' 1>'.l:tmps[0].' 2>'.l:tmps[1]
+  " longer version, redirect output to different files
+  let l:command = l:cmd.' 1>'.l:tmps[0].' 2>'.l:tmps[1]
   let l:res = [[], []]
   if has("nvim")
-    let l:argv = ['sh', '-c', l:command]
-    call s:PDebug("s:ClangExecute::job.argv", l:argv, 2)
-    call jobstart(l:argv, {'fstdout': l:tmps[0], 'fstderr': l:tmps[1], 'on_exit': function('ClangExecuteNeoJobHandler')})
+    call s:PDebug("s:ClangExecute::cmd", l:cmd, 2)
+    " try to force stop last job which doesn't exit.
+    if exists('b:clang_execute_neojob_id')
+      try
+        call jobstop(b:clang_execute_neojob_id)
+      catch
+        " Ignore
+      endtry
+    endif
+
+    let l:argv = [g:clang_sh_exec, '-c', l:cmd]
+    " FuncRef must start with cap var
+    let l:Handler = function('ClangExecuteNeoJobHandler')
+    let l:opts = {'on_stdout': l:Handler, 'on_stderr': l:Handler, 'on_exit': l:Handler}
+    let l:jobid = jobstart(l:argv, l:opts)
+    let b:clang_execute_neojob_id = l:jobid
+
+    if l:jobid > 0
+      call s:PDebug("s:ClangExecute::jobid", l:jobid, 2)
+      call jobsend(l:jobid, l:src)
+      call jobclose(l:jobid, 'stdin')
+    else
+      call s:PError("s:ClangExecute", "Invalid jobid >> ".
+           \ (l:jobid < 0 ? "Invalid clang_sh_exec" : "Job table is full or invalid arguments"))
+    endif
   elseif !exists('v:servername') || empty(v:servername)
     let b:clang_state['state'] = 'ready'
     call s:PDebug("s:ClangExecute::cmd", l:command, 2)
@@ -930,33 +975,43 @@ func! s:ClangExecute(root, clang_options, line, col)
   return l:res
 endf
 "}}}
-" {{{ ClangExecuteDone
+"{{{ ClangExecuteDone
 " Called by vim-client when clang is returned in asynchronized mode.
 "
 " Buffer vars:
 "     b:clang_state => {
-"       'state' :  // updated to 'sync' in async mode
 "       'stdout':  // updated in async mode
 "       'stderr':  // updated in async mode
 "     }
 func! ClangExecuteDone(tmp1, tmp2)
   let l:res = s:DeleteAfterReadTmps([a:tmp1, a:tmp2])
-  let b:clang_state['state'] = 'sync'
   let b:clang_state['stdout'] = l:res[0]
   let b:clang_state['stderr'] = l:res[1]
-  call s:PDebug("ClangExecuteDone::stdout", l:res[0], 3)
-  call s:PDebug("ClangExecuteDone::stderr", l:res[1], 2)
+  call s:ClangExecuteDoneTriggerCompletion()
+endf
+"}}}
+"{{{ s:ClangExecuteDoneTriggerCompletion
+" Won't overwirte 'stdout' and 'stderr' in b:clang_state
+"
+" Buffer vars:
+"     b:clang_state => {
+"       'state' :  // updated to 'sync' in async mode
+"     }
+func! s:ClangExecuteDoneTriggerCompletion()
+  let b:clang_state['state'] = 'sync'
+  call s:PDebug("ClangExecuteDoneTriggerCompletion::stdout", b:clang_state['stdout'], 3)
+  call s:PDebug("ClangExecuteDoneTriggerCompletion::stderr", b:clang_state['stderr'], 2)
   call feedkeys("\<Esc>a")
   " As the default action of <C-x><C-o> causes a 'pattern not found'
   " when the result is empty, which break our input, that's really painful...
-  if ! empty(l:res[0])
+  if ! empty(b:clang_state['stdout'])
     call feedkeys("\<C-x>\<C-o>")
   else
     call ClangComplete(0, ClangComplete(1, 0))
   endif
 endf
-" }}}
-" {{{ s:ClangSyntaxCheck
+"}}}
+"{{{ s:ClangSyntaxCheck
 " Only do syntax check without completion, will open diags window when have
 " problem. Now this function will block...
 func! s:ClangSyntaxCheck(root, clang_options)
@@ -976,7 +1031,7 @@ func! s:ClangFormat(file)
   let l:command = printf("%s -i -style=%s %s", g:clang_format_exec, g:clang_format_style, expand(a:file))
   call system(l:command)
 endf
-" }}}
+"}}}
 "{{{ ClangComplete
 " More about @findstart and @base to check :h omnifunc
 " Async mode states:
