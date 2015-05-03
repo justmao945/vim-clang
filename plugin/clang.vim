@@ -866,9 +866,9 @@ func! ClangExecuteNeoJobHandler(job_id, data, event)
     endif
     let b:clang_state[a:event] += a:data
   elseif a:event == 'exit'
-    for stream in ['stdout', 'stderr']
-      if len(b:clang_state[stream]) != 0 && b:clang_state[stream][-1] == ''
-        call remove(b:clang_state[stream], -1)
+    for event in ['stdout', 'stderr']
+      if !empty(b:clang_state[event]) && empty(b:clang_state[event][-1])
+        call remove(b:clang_state[event], -1)
       endif
     endfor
     call s:ClangExecuteDoneTriggerCompletion()
