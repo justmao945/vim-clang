@@ -843,10 +843,28 @@ func! s:ClangCompleteInit(force)
 endf
 "}}}
 "{{{ ClangExecuteNeoJobHandler
-"handles event: exit
+"Handles stdout/stderr/exit events, and stores the stdout/stderr received from the shells.
 func! ClangExecuteNeoJobHandler(job_id, data, event)
-  if a:event == 'exit'
-    call ClangExecuteDone(self.fstdout, self.fstderr)
+  if index(['stdout', 'stderr'], a:event) >= 0
+    " when a:data[-1] is empty, which means is a complete line, otherwise need to concat a:data[-1]
+    if len(b:clang_state[a:event]) != 0
+      if b:clang_state[a:event][-1] == ''
+        " a complete line, just remove the last empty line
+        call remove(b:clang_state[a:event], -1)
+      else
+        " need to concat to the last line in previous chunk
+        let b:clang_state[a:event][-1] .= a:data[0]
+        call remove(a:data, 0)
+      endif
+    endif
+    let b:clang_state[a:event] += a:data
+  elseif a:event == 'exit'
+    for item in ['stdout', 'stderr']
+      if len(b:clang_state[item]) != 0 && b:clang_state[item][-1] == ''
+        call remove(b:clang_state[item], -1)
+      endif
+    endfor
+    call s:ClangExecuteDoneTriggerCompletion()
   endif
 endf
 "}}}
@@ -877,9 +895,34 @@ func! s:ClangExecute(root, clang_options, line, col)
   let l:command .= ' 1>'.l:tmps[0].' 2>'.l:tmps[1]
   let l:res = [[], []]
   if has("nvim")
-    let l:argv = ['sh', '-c', l:command]
-    call s:PDebug("s:ClangExecute::job.argv", l:argv, 2)
-    call jobstart(l:argv, {'fstdout': l:tmps[0], 'fstderr': l:tmps[1], 'on_exit': function('ClangExecuteNeoJobHandler')})
+    let l:command = printf('%s -cc1 -x c++ -fsyntax-only -code-completion-macros -code-completion-at -:%d:%d %s',
+                      \ g:clang_exec, a:line, a:col, a:clang_options)
+    call s:PDebug("s:ClangExecute::cmd", l:command, 2)
+
+    " try to force stop last job which doesn't exit.
+    if exists('b:clang_execute_neojob_id')
+      try
+        call jobstop(b:clang_execute_neojob_id)
+      catch
+        " Ignore
+      endtry
+    endif
+
+    let l:argv = [g:clang_sh_exec, '-c', l:command]
+    let l:opts = {
+        \ 'on_stdout': function('ClangExecuteNeoJobHandler'),
+        \ 'on_stderr': function('ClangExecuteNeoJobHandler'),
+        \ 'on_exit': function('ClangExecuteNeoJobHandler')}
+    let b:clang_execute_neojob_id = jobstart(l:argv, l:opts)
+
+    if b:clang_execute_neojob_id > 0
+      call s:PDebug("s:ClangExecute::jobid", b:clang_execute_neojob_id, 2)
+      call jobsend(b:clang_execute_neojob_id, l:src)
+      call jobclose(b:clang_execute_neojob_id, 'stdin')
+    else
+      call s:PError("s:ClangExecute", "Invalid jobid >> ".
+           \ (b:clang_execute_neojob_id < 0 ? "Invalid clang_sh_exec" : "Job table is full or invalid arguments"))
+    endif
   elseif !exists('v:servername') || empty(v:servername)
     let b:clang_state['state'] = 'ready'
     call s:PDebug("s:ClangExecute::cmd", l:command, 2)
@@ -904,32 +947,42 @@ func! s:ClangExecute(root, clang_options, line, col)
   return l:res
 endf
 "}}}
-" {{{ ClangExecuteDone
+"{{{ ClangExecuteDone
 " Called by vim-client when clang is returned in asynchronized mode.
 "
 " Buffer vars:
 "     b:clang_state => {
-"       'state' :  // updated to 'sync' in async mode
 "       'stdout':  // updated in async mode
 "       'stderr':  // updated in async mode
 "     }
 func! ClangExecuteDone(tmp1, tmp2)
   let l:res = s:DeleteAfterReadTmps([a:tmp1, a:tmp2])
-  let b:clang_state['state'] = 'sync'
   let b:clang_state['stdout'] = l:res[0]
   let b:clang_state['stderr'] = l:res[1]
-  call s:PDebug("ClangExecuteDone::stdout", l:res[0], 3)
-  call s:PDebug("ClangExecuteDone::stderr", l:res[1], 2)
+  call s:ClangExecuteDoneTriggerCompletion()
+endf
+"}}}
+"{{{ s:ClangExecuteDoneTriggerCompletion
+" Won't overwirte 'stdout' and 'stderr' in b:clang_state
+"
+" Buffer vars:
+"     b:clang_state => {
+"       'state' :  // updated to 'sync' in async mode
+"     }
+func! s:ClangExecuteDoneTriggerCompletion()
+  let b:clang_state['state'] = 'sync'
+  call s:PDebug("ClangExecuteDoneTriggerCompletion::stdout", b:clang_state['stdout'], 3)
+  call s:PDebug("ClangExecuteDoneTriggerCompletion::stderr", b:clang_state['stderr'], 2)
   call feedkeys("\<Esc>a")
   " As the default action of <C-x><C-o> causes a 'pattern not found'
   " when the result is empty, which break our input, that's really painful...
-  if ! empty(l:res[0])
+  if ! empty(b:clang_state['stdout'])
     call feedkeys("\<C-x>\<C-o>")
   else
     call ClangComplete(0, ClangComplete(1, 0))
   endif
 endf
-" }}}
+"}}}
 "{{{ ClangComplete
 " More about @findstart and @base to check :h omnifunc
 " Async mode states:
