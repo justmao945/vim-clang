@@ -847,8 +847,8 @@ endf
 func! ClangExecuteNeoJobHandler(job_id, data, event)
   if index(['stdout', 'stderr'], a:event) >= 0
     " when a:data[-1] is empty, which means is a complete line, otherwise need to concat a:data[-1]
-    if len(b:clang_state[a:event]) != 0
-      if b:clang_state[a:event][-1] == ''
+    if !empty(b:clang_state[a:event])
+      if empty(b:clang_state[a:event][-1])
         " a complete line, just remove the last empty line
         call remove(b:clang_state[a:event], -1)
       else
@@ -859,9 +859,9 @@ func! ClangExecuteNeoJobHandler(job_id, data, event)
     endif
     let b:clang_state[a:event] += a:data
   elseif a:event == 'exit'
-    for item in ['stdout', 'stderr']
-      if len(b:clang_state[item]) != 0 && b:clang_state[item][-1] == ''
-        call remove(b:clang_state[item], -1)
+    for stream in ['stdout', 'stderr']
+      if len(b:clang_state[stream]) != 0 && b:clang_state[stream][-1] == ''
+        call remove(b:clang_state[stream], -1)
       endif
     endfor
     call s:ClangExecuteDoneTriggerCompletion()
@@ -880,6 +880,9 @@ endf
 "       'stdout':  // updated in sync mode
 "       'stderr':  // updated in sync mode
 "     }
+"
+"     b:clang_execute_neojob_id  // used to stop previous job
+"
 " @root Clang root, project directory
 " @clang_options Options appended to clang binary image
 " @line Line to complete
@@ -889,16 +892,15 @@ func! s:ClangExecute(root, clang_options, line, col)
   let l:cwd = fnameescape(getcwd())
   exe 'lcd ' . a:root
   let l:src = join(getline(1, '$'), "\n") . "\n"
-  let l:command = printf('%s -fsyntax-only -Xclang -code-completion-macros -Xclang -code-completion-at=-:%d:%d %s -',
+  " shorter version, without redirecting stdout and stderr
+  let l:cmd = printf('%s -fsyntax-only -Xclang -code-completion-macros -Xclang -code-completion-at=-:%d:%d %s -',
                       \ g:clang_exec, a:line, a:col, a:clang_options)
   let l:tmps = [tempname(), tempname()]
-  let l:command .= ' 1>'.l:tmps[0].' 2>'.l:tmps[1]
+  " longer version, redirect output to different files
+  let l:command = l:cmd.' 1>'.l:tmps[0].' 2>'.l:tmps[1]
   let l:res = [[], []]
   if has("nvim")
-    let l:command = printf('%s -cc1 -x c++ -fsyntax-only -code-completion-macros -code-completion-at -:%d:%d %s',
-                      \ g:clang_exec, a:line, a:col, a:clang_options)
-    call s:PDebug("s:ClangExecute::cmd", l:command, 2)
-
+    call s:PDebug("s:ClangExecute::cmd", l:cmd, 2)
     " try to force stop last job which doesn't exit.
     if exists('b:clang_execute_neojob_id')
       try
@@ -908,20 +910,20 @@ func! s:ClangExecute(root, clang_options, line, col)
       endtry
     endif
 
-    let l:argv = [g:clang_sh_exec, '-c', l:command]
-    let l:opts = {
-        \ 'on_stdout': function('ClangExecuteNeoJobHandler'),
-        \ 'on_stderr': function('ClangExecuteNeoJobHandler'),
-        \ 'on_exit': function('ClangExecuteNeoJobHandler')}
-    let b:clang_execute_neojob_id = jobstart(l:argv, l:opts)
+    let l:argv = [g:clang_sh_exec, '-c', l:cmd]
+    " FuncRef must start with cap var
+    let l:Handler = function('ClangExecuteNeoJobHandler')
+    let l:opts = {'on_stdout': l:Handler, 'on_stderr': l:Handler, 'on_exit': l:Handler}
+    let l:jobid = jobstart(l:argv, l:opts)
+    let b:clang_execute_neojob_id = l:jobid
 
-    if b:clang_execute_neojob_id > 0
-      call s:PDebug("s:ClangExecute::jobid", b:clang_execute_neojob_id, 2)
-      call jobsend(b:clang_execute_neojob_id, l:src)
-      call jobclose(b:clang_execute_neojob_id, 'stdin')
+    if l:jobid > 0
+      call s:PDebug("s:ClangExecute::jobid", l:jobid, 2)
+      call jobsend(l:jobid, l:src)
+      call jobclose(l:jobid, 'stdin')
     else
       call s:PError("s:ClangExecute", "Invalid jobid >> ".
-           \ (b:clang_execute_neojob_id < 0 ? "Invalid clang_sh_exec" : "Job table is full or invalid arguments"))
+           \ (l:jobid < 0 ? "Invalid clang_sh_exec" : "Job table is full or invalid arguments"))
     endif
   elseif !exists('v:servername') || empty(v:servername)
     let b:clang_state['state'] = 'ready'
