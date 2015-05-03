@@ -1,34 +1,3 @@
-"{{{ Description
-" Script Name: clang.vim
-" Version:     1.0.0-beta (2013-xx-xx)
-" Authors:     2013~     Jianjun Mao <justmao945@gmail.com>
-"
-" Description: Use of clang to parse in C/C++ source files.
-" Notes:
-"   1. Make sure `clang` is available in path when g:clang_exec is empty
-"
-"   2. Make sure `vim` is available in path if uses asynchronized mode(default)
-"     if g:clang_vim_exec is empty.
-"
-" TODO:
-"   1. Private members filter
-"   2. Remove OmniComplete .... Pattern Not Found error?...
-"      * This has been fixed in asynchronized mode, because I can control the
-"        completion action.
-"   3. Test cases....
-"      * Really hard to do this automatically, just test manually.
-"
-" Issues:
-"   1. When complete an identifier only has a char, the char will be deleted by
-"      OmniCompletion with 'longest' completeopt.
-"      Vim verison: 7.3.754
-"   
-" References:
-"   [1] http://clang.llvm.org/docs/
-"   [2] VIM help file
-"   [3] VIM scripts [vim-buffergator, clang_complete, AsyncCommand,
-"                    vim-marching]
-"}}}
 "{{{ Global initialization
 if exists('g:clang_loaded')
   finish
@@ -135,15 +104,27 @@ func! s:IsValidFile()
 endf
 "}}}
 "{{{ s:PDebug
-" Uses 'echom' to preserve @info when g:clang_debug is not 0.
-" Call ':messages' to see debug info
+" Use `:messages` to see debug info or read the var `b:clang_pdebug_storage`
+" TODO: pretty print of info and write b:clang_pdebug_storage to new buffer,
+" file, or someother places...
+" 
+" Buffer var used to store messages
+"   b:clang_pdebug_storage
+"
 " @head Prefix of debug info
 " @info Can be a string list, string, or dict
 " @lv   Debug level, write info only when lv < g:clang_debug, deault is 1
 func! s:PDebug(head, info, ...)
   let l:lv = a:0 > 0 && a:1 > 1 ? a:1 : 1
+
+  if !exists('b:clang_pdebug_storage')
+    let b:clang_pdebug_storage = []
+  endif
+
   if l:lv <= g:clang_debug
-    echom printf("Clang: debug: %s >>> %s", string(a:head), string(a:info))
+    let l:msg = printf("Clang: debug: %s >>> %s", string(a:head), string(a:info))
+    echom l:msg
+    call add(b:clang_pdebug_storage, l:msg)
   endif
 endf
 "}}}
@@ -324,7 +305,7 @@ func! s:DiagnosticsWindowOpen(src, diags)
 
   " Here uses t:clang_diags_bufnr to keep only one window in a *tab*
   if !exists('t:clang_diags_bufnr') || !bufexists(t:clang_diags_bufnr)
-    let t:clang_diags_bufnr = bufnr('ClangDiagnostics@' . last_buffer_nr(), 1)
+    let t:clang_diags_bufnr = bufnr('ClangDiagnostics@' . bufnr('%'), 1)
   endif
   let l:cbuf = bufnr('%')
 
