@@ -911,17 +911,19 @@ func! s:ClangExecute(root, clang_options, line, col)
     endif
 
     let l:argv = [g:clang_sh_exec, '-c', l:cmd]
-    let l:handler = function('ClangExecuteNeoJobHandler')
-    let l:opts = {'on_stdout': l:handler, 'on_stderr': l:handler, 'on_exit': l:handler}
-    let b:clang_execute_neojob_id = jobstart(l:argv, l:opts)
+    " FuncRef must start with cap var
+    let l:Handler = function('ClangExecuteNeoJobHandler')
+    let l:opts = {'on_stdout': l:Handler, 'on_stderr': l:Handler, 'on_exit': l:Handler}
+    let l:jobid = jobstart(l:argv, l:opts)
+    let b:clang_execute_neojob_id = l:jobid
 
-    if b:clang_execute_neojob_id > 0
-      call s:PDebug("s:ClangExecute::jobid", b:clang_execute_neojob_id, 2)
-      call jobsend(b:clang_execute_neojob_id, l:src)
-      call jobclose(b:clang_execute_neojob_id, 'stdin')
+    if l:jobid > 0
+      call s:PDebug("s:ClangExecute::jobid", l:jobid, 2)
+      call jobsend(l:jobid, l:src)
+      call jobclose(l:jobid, 'stdin')
     else
       call s:PError("s:ClangExecute", "Invalid jobid >> ".
-           \ (b:clang_execute_neojob_id < 0 ? "Invalid clang_sh_exec" : "Job table is full or invalid arguments"))
+           \ (l:jobid < 0 ? "Invalid clang_sh_exec" : "Job table is full or invalid arguments"))
     endif
   elseif !exists('v:servername') || empty(v:servername)
     let b:clang_state['state'] = 'ready'
