@@ -302,11 +302,11 @@ func! s:DiagnosticsWindowOpen(src, diags)
   let l:mode      = g:clang_diagsopt[0 : l:i-1]
   let l:maxheight = g:clang_diagsopt[l:i+1 : -1]
 
+  let l:cbuf = bufnr('%')
   " Here uses t:clang_diags_bufnr to keep only one window in a *tab*
   if !exists('t:clang_diags_bufnr') || !bufexists(t:clang_diags_bufnr)
-    let t:clang_diags_bufnr = bufnr('ClangDiagnostics@' . bufnr('%'), 1)
+    let t:clang_diags_bufnr = bufnr('ClangDiagnostics@' . l:cbuf, 1)
   endif
-  let l:cbuf = bufnr('%')
 
   let l:winnr = bufwinnr(t:clang_diags_bufnr)
   if l:winnr == -1
@@ -320,7 +320,7 @@ func! s:DiagnosticsWindowOpen(src, diags)
     endif
   elseif empty(l:diags)
     " just close window(but not preview window) and return
-    call s:DiagnosticsWindowClose(0)
+    call s:DiagnosticsWindowClose()
     return -1
   else
     " goto the exist window
@@ -387,29 +387,16 @@ endf
 "}}}
 ""{{{ s:DiagnosticsWindowClose
 " Close diagnostics window or quit the editor
-" @when_bufwinleave set to 1 if is called by BufWinLeave event
 " Tab variable
 "   t:clang_diags_bufnr
-"   t:clang_diags_driver_bufnr
-func! s:DiagnosticsWindowClose(when_bufwinleave)
+func! s:DiagnosticsWindowClose()
   " diag window buffer is not exist
   if !exists('t:clang_diags_bufnr')
     return
   endif
-
   call s:PDebug("s:DiagnosticsWindowClose", "try")
 
   let l:cbn = bufnr('%')
-  " is invalid file and not in diag window
-  if ! s:IsValidFile() && l:cbn != t:clang_diags_bufnr
-    return
-  endif
-
-  " is not leave from the driver buffer window
-  if a:when_bufwinleave && (!exists('t:clang_diags_driver_bufnr') || l:cbn != t:clang_diags_driver_bufnr)
-    return
-  end
-
   let l:cwn = bufwinnr(l:cbn)
   let l:dwn = bufwinnr(t:clang_diags_bufnr)
 
@@ -419,24 +406,32 @@ func! s:DiagnosticsWindowClose(when_bufwinleave)
   endif
 
   exe l:dwn . 'wincmd w'
-  if a:when_bufwinleave && winbufnr(3) == -1
-    " quit editor when called before leave the driver window
-    qall!
-  else
-    " just hide the diag window
-    hide
-  endif
+  hide
   exe l:cwn . 'wincmd w'
 
   call s:PDebug("s:DiagnosticsWindowClose", l:dwn)
 endf
 "}}}
 "{{{ s:DiagnosticsPreviewWindowClose
-" @when_bufwinleave set to 1 if is called by BufWinLeave event
-func! s:DiagnosticsPreviewWindowClose(when_bufwinleave)
+func! s:DiagnosticsPreviewWindowClose()
   call s:PDebug("s:DiagnosticsPreviewWindowClose", "")
   pclose
-  call s:DiagnosticsWindowClose(a:when_bufwinleave)
+  call s:DiagnosticsWindowClose()
+endf
+"}}}
+"{{{ s:DiagnosticsPreviewWindowCloseWhenLeave
+" Called when BufWinLeave, close preivew and window when leave from the driver
+" buffer
+func! s:DiagnosticsPreviewWindowCloseWhenLeave()
+  if !exists('t:clang_diags_driver_bufnr')
+    return
+  endif
+
+  let l:cbuf = expand('<abuf>')
+  if l:cbuf != t:clang_diags_driver_bufnr
+    return
+  endif
+  call s:DiagnosticsPreviewWindowClose()
 endf
 "}}}
 "{{{  s:GenPCH
@@ -481,7 +476,7 @@ func! s:GenPCH(clang, header)
     " may want to discover pch
     call s:ClangCompleteInit(1)
     " close the error window
-    call s:DiagnosticsWindowClose(0)
+    call s:DiagnosticsWindowClose()
     call s:PLog("s:GenPCH", 'Clang creates PCH flie ' . l:header . '.pch successfully!')
   endif
   return l:clang_output
@@ -783,7 +778,7 @@ func! s:ClangCompleteInit(force)
   com! -nargs=* ClangGenPCHFromFile call <SID>GenPCH(g:clang_exec, <f-args>)
   
   " Create close diag and preview window command
-  com! ClangCloseWindow  call <SID>DiagnosticsPreviewWindowClose(0)
+  com! ClangCloseWindow  call <SID>DiagnosticsPreviewWindowClose()
 
   " Useful to re-initialize plugin if .clang is changed
   com! ClangCompleteInit call <SID>ClangCompleteInit(1)
@@ -829,8 +824,7 @@ func! s:ClangCompleteInit(force)
           \ endif
   endif
 
-  "FIXME buggy when use :e, see #41
-  "au BufWinLeave <buffer> call <SID>DiagnosticsPreviewWindowClose(1)
+  au BufWinLeave <buffer> call <SID>DiagnosticsPreviewWindowCloseWhenLeave()
 
   au BufEnter <buffer> call <SID>BufVarSet()
   au BufLeave <buffer> call <SID>BufVarRestore()
