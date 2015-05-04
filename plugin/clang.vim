@@ -406,7 +406,7 @@ func! s:DiagnosticsWindowClose()
   endif
 
   exe l:dwn . 'wincmd w'
-  hide
+  quit
   exe l:cwn . 'wincmd w'
 
   call s:PDebug("s:DiagnosticsWindowClose", l:dwn)
@@ -420,8 +420,8 @@ func! s:DiagnosticsPreviewWindowClose()
 endf
 "}}}
 "{{{ s:DiagnosticsPreviewWindowCloseWhenLeave
-" Called when BufWinLeave, close preivew and window when leave from the driver
-" buffer
+" Called when driver buffer is unavailable, close preivew and window when
+" leave from the driver buffer
 func! s:DiagnosticsPreviewWindowCloseWhenLeave()
   if !exists('t:clang_diags_driver_bufnr')
     return
@@ -824,7 +824,7 @@ func! s:ClangCompleteInit(force)
           \ endif
   endif
 
-  au BufWinLeave <buffer> call <SID>DiagnosticsPreviewWindowCloseWhenLeave()
+  au BufUnload <buffer> call <SID>DiagnosticsPreviewWindowCloseWhenLeave()
 
   au BufEnter <buffer> call <SID>BufVarSet()
   au BufLeave <buffer> call <SID>BufVarRestore()
