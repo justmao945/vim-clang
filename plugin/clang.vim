@@ -167,7 +167,6 @@ endf
 " }}}
 " {{{ s:Complete[Dot|Arrow|Colon]
 " Tigger a:cmd when cursor is after . -> and ::
-
 func! s:ShouldComplete()
   if getline('.') =~# '#\s*\(include\|import\)' || getline('.')[col('.') - 2] == "'"
     return 0
@@ -512,9 +511,7 @@ func! s:GlobalVarRestore(values)
 endf
 " }}}
 " {{{ s:HasPreviewAbove
-" 
 " Detect above view is preview window or not.
-"
 func! s:HasPreviewAbove()
   let l:cbuf = bufnr('%')
   let l:has = 0
@@ -1099,8 +1096,9 @@ func! s:ClangComplete(findstart, base)
     
     " update completions by new l:base
     let b:clang_cache['completions'] = s:ParseCompletionResult(b:clang_state['stdout'], l:base)
-    " close preview window if empty
-    if empty(b:clang_cache['completions'])
+    " close preview window if empty or has no preview window above, may above
+    " other windows...
+    if empty(b:clang_cache['completions']) || !s:HasPreviewAbove()
       pclose
     endif
     " call to show diagnostics
