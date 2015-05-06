@@ -754,6 +754,11 @@ func! s:ClangCompleteInit(force)
     for l:dir in l:incs
       let b:clang_options .= ' -I ' . shellescape(l:dir)
     endfor
+    " support include path file completion for neocomplete
+    if !exists('g:neocomplete#sources#include#paths')
+      let g:neocomplete#sources#include#paths = {}
+    endif
+    let g:neocomplete#sources#include#paths[&filetype] = join(l:incs, ',')
   endif
   
   " parse include path from &path
