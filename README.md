@@ -84,6 +84,28 @@ find that's too 'slow' to wait the completion...
   [syswow][6].
 
 
+
+Include file path completion ?
+--------------------
+Please use with [neocomplete][7], they can work well together.
+```viml
+" disable auto completion for vim-clang
+let g:clang_auto = 0
+
+" use neocomplete
+" input patterns
+if !exists('g:neocomplete#force_omni_input_patterns')
+  let g:neocomplete#force_omni_input_patterns = {}
+endif
+
+" for c and c++
+let g:neocomplete#force_omni_input_patterns.c =
+      \ '[^.[:digit:] *\t]\%(\.\|->\)\w*'
+let g:neocomplete#force_omni_input_patterns.cpp =
+      \ '[^.[:digit:] *\t]\%(\.\|->\)\w*\|\h\w*::\w*'
+```
+
+
 Options and Commands
 --------------------
 `:h clang.txt`
@@ -99,3 +121,4 @@ Now only tested on Linux (Ubuntu/Debian) and Mac OSX
 [4]: https://github.com/tpope/vim-pathogen
 [5]: https://github.com/Valloric/YouCompleteMe
 [6]: https://github.com/syswow
+[7]: https://github.com/Shougo/neocomplete
