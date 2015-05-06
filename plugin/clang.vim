@@ -754,11 +754,6 @@ func! s:ClangCompleteInit(force)
     for l:dir in l:incs
       let b:clang_options .= ' -I ' . shellescape(l:dir)
     endfor
-    " support include path file completion for neocomplete
-    if !exists('g:neocomplete#sources#include#paths')
-      let g:neocomplete#sources#include#paths = {}
-    endif
-    let g:neocomplete#sources#include#paths[&filetype] = join(l:incs, ',')
   endif
   
   " parse include path from &path
@@ -776,8 +771,27 @@ func! s:ClangCompleteInit(force)
     endfor
   endif
 
+  " discover include directories *again* for neocomplete.
+  if !exists('g:neocomplete#sources#include#paths')
+    let g:neocomplete#sources#include#paths = {}
+  endif
+  let l:incs = s:DiscoverIncludeDirs(g:clang_exec, b:clang_options)
+  " FIXME: should not overwrite?
+  let g:neocomplete#sources#include#paths[&filetype] = join(l:incs, ',')
+
   " backup options without PCH support
   let b:clang_options_noPCH = b:clang_options
+  " try to find PCH files in clang_root and clang_root/include
+  " Or add `-include-pch /path/to/x.h.pch` into the root file .clang manully
+  if &filetype == 'cpp' && b:clang_options !~# '-include-pch'
+    let l:cwd = fnameescape(getcwd())
+    exe 'lcd ' . b:clang_root
+    let l:afx = findfile(g:clang_stdafx_h, '.;./include') . '.pch'
+    if filereadable(l:afx)
+      let b:clang_options .= ' -include-pch ' . shellescape(l:afx)
+    endif
+    exe 'lcd '.l:cwd
+  endif
 
   " Create GenPCH command
   com! -nargs=* ClangGenPCHFromFile call <SID>GenPCH(g:clang_exec, <f-args>)
@@ -793,18 +807,6 @@ func! s:ClangCompleteInit(force)
 
   " Useful to format source code
   com! ClangFormat call <SID>ClangFormat('%')
-
-  " try to find PCH files in clang_root and clang_root/include
-  " Or add `-include-pch /path/to/x.h.pch` into the root file .clang manully
-  if &filetype == 'cpp' && b:clang_options !~# '-include-pch'
-    let l:cwd = fnameescape(getcwd())
-    exe 'lcd ' . b:clang_root
-    let l:afx = findfile(g:clang_stdafx_h, '.;./include') . '.pch'
-    if filereadable(l:afx)
-      let b:clang_options .= ' -include-pch ' . shellescape(l:afx)
-    endif
-    exe 'lcd '.l:cwd
-  endif
 
   if g:clang_auto   " Auto completion
     inoremap <expr> <buffer> . <SID>CompleteDot()
