@@ -4,24 +4,8 @@ if exists('g:clang_loaded')
 endif
 let g:clang_loaded = 1
 
-if !exists('g:clang_load_if_clang_dotfile')
-  let g:clang_load_if_clang_dotfile = 0
-endif
-
-if !exists('g:clang_dotfile')
-  let g:clang_dotfile = '.clang'
-endif
-
-if !exists('g:clang_dotfile_overwrite')
-  let g:clang_dotfile_overwrite = '.clang.ow'
-endif
-
 if !exists('g:clang_auto')
   let g:clang_auto = 1
-endif
-
-if !exists('g:clang_format_auto')
-  let g:clang_format_auto = 0
 endif
 
 if !exists('g:clang_c_options')
@@ -48,8 +32,20 @@ if !exists('g:clang_diagsopt') || g:clang_diagsopt !~# '^[a-z]\+\(:[0-9]\)\?$'
   let g:clang_diagsopt = 'rightbelow:6'
 endif
 
+if !exists('g:clang_dotfile')
+  let g:clang_dotfile = '.clang'
+endif
+
+if !exists('g:clang_dotfile_overwrite')
+  let g:clang_dotfile_overwrite = '.clang.ow'
+endif
+
 if !exists('g:clang_exec')
   let g:clang_exec = 'clang'
+endif
+
+if !exists('g:clang_format_auto')
+  let g:clang_format_auto = 0
 endif
 
 if !exists('g:clang_format_exec')
@@ -62,6 +58,10 @@ end
 
 if !exists('g:clang_include_sysheaders')
   let g:clang_include_sysheaders = 1
+endif
+
+if !exists('g:clang_load_if_clang_dotfile')
+  let g:clang_load_if_clang_dotfile = 0
 endif
 
 if !exists('g:clang_pwheight')
@@ -81,16 +81,16 @@ if !exists('g:clang_stdafx_h')
   let g:clang_stdafx_h = 'stdafx.h'
 endif
 
+if !exists('g:clang_use_path')
+  let g:clang_use_path = 1
+endif
+
 if !exists('g:clang_vim_exec')
   if has('mac')
     let g:clang_vim_exec = 'mvim'
   else
     let g:clang_vim_exec = 'vim'
   endif
-endif
-
-if !exists('g:clang_use_path')
-  let g:clang_use_path = 1
 endif
 
 " Init on c/c++ files
