@@ -12,6 +12,7 @@ Use of clang to parse and complete C/C++ source files.
 
 Installation
 -------------
+* Require executable `clang` installed.
 * Put the file `plugin/clang.vim` into `~/.vim/plugin` is OK.
 * [pathogen.vim][4] `cd ~/.vim/bundle; git clone https://github.com/justmao945/vim-clang.git` is recommended.
 
