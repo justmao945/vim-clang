@@ -92,6 +92,9 @@ Please use with [neocomplete][7], they can work well together.
 ```viml
 " disable auto completion for vim-clang
 let g:clang_auto = 0
+" default 'longest' can not work with neocomplete
+let g:clang_c_completeopt = 'menuone,preview'
+let g:clang_cpp_completeopt = 'menuone,preview'
 
 " use neocomplete
 " input patterns
