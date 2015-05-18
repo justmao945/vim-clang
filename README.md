@@ -85,31 +85,6 @@ find that's too 'slow' to wait the completion...
   [syswow][6].
 
 
-
-Include file path completion ?
---------------------
-Please use with [neocomplete][7], they can work well together.
-```viml
-" disable auto completion for vim-clang
-let g:clang_auto = 0
-" default 'longest' can not work with neocomplete
-let g:clang_c_completeopt = 'menuone,preview'
-let g:clang_cpp_completeopt = 'menuone,preview'
-
-" use neocomplete
-" input patterns
-if !exists('g:neocomplete#force_omni_input_patterns')
-  let g:neocomplete#force_omni_input_patterns = {}
-endif
-
-" for c and c++
-let g:neocomplete#force_omni_input_patterns.c =
-      \ '[^.[:digit:] *\t]\%(\.\|->\)\w*'
-let g:neocomplete#force_omni_input_patterns.cpp =
-      \ '[^.[:digit:] *\t]\%(\.\|->\)\w*\|\h\w*::\w*'
-```
-
-
 Options and Commands
 --------------------
 `:h clang.txt`
