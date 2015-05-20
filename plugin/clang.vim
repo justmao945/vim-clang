@@ -4,6 +4,8 @@ if exists('g:clang_loaded')
 endif
 let g:clang_loaded = 1
 
+let s:is_windows = has('win16') || has('win32') || has('win64') || has('win95')
+
 if !exists('g:clang_auto')
   let g:clang_auto = 1
 endif
@@ -69,8 +71,11 @@ if !exists('g:clang_pwheight')
 endif
 
 if !exists('g:clang_sh_exec')
-  " TODO: Need bash or sh on Microsoft Windows, cmd.exe is not supported.
-  let g:clang_sh_exec = 'sh'
+  if s:is_windows
+    let g:clang_sh_exec = &shell
+  else
+    let g:clang_sh_exec = 'sh'
+  endif
 endif
 
 if !exists('g:clang_statusline')
@@ -244,7 +249,12 @@ endf
 " @options Additional options passed to clang, e.g. -stdlib=libc++
 " @return List of dirs: ['path1', 'path2', ...]
 func! s:DiscoverIncludeDirs(clang, options)
-  let l:command = printf('echo | %s -fsyntax-only -v %s - 2>&1', a:clang, a:options)
+  if s:is_windows
+    let l:command = 'type NUL | '
+  else
+    let l:command = 'echo | '
+  endif
+  let l:command .= printf('%s -fsyntax-only -v %s - 2>&1', a:clang, a:options)
   call s:PDebug("s:DiscoverIncludeDirs::cmd", l:command, 2)
   let l:clang_output = split(system(l:command), "\n")
   call s:PDebug("s:DiscoverIncludeDirs::raw", l:clang_output, 3)
@@ -904,6 +914,8 @@ func! s:ClangExecute(root, clang_options, line, col)
   " longer version, redirect output to different files
   let l:command = l:cmd.' 1>'.l:tmps[0].' 2>'.l:tmps[1]
   let l:res = [[], []]
+  let b:clang_state['stdout'] = l:res[0]
+  let b:clang_state['stderr'] = l:res[1]
   if has("nvim")
     call s:PDebug("s:ClangExecute::cmd", l:cmd, 2)
     " try to force stop last job which doesn't exit.
@@ -941,16 +953,25 @@ func! s:ClangExecute(root, clang_options, line, col)
     " Please note that '--remote-expr' executes expressions in server, but
     " '--remote-send' only sends keys, which is same as type keys in server...
     " Here occurs a bug if uses '--remote-send', the 'col(".")' is not right.
-    let l:keys = printf('ClangExecuteDone("%s","%s")', l:tmps[0], l:tmps[1])
-    let l:vcmd = printf('%s -s --noplugin --servername %s --remote-expr %s',
-                      \ g:clang_vim_exec, shellescape(v:servername), shellescape(l:keys))
-    let l:command = '('.l:command.';'.l:vcmd.') &'
-    call s:PDebug("s:ClangExecute::cmd", l:command, 2)
-    call system(l:command, l:src)
+    if s:is_windows
+      let l:keys = printf("ClangExecuteDone('%s','%s')", l:tmps[0], l:tmps[1])
+      let l:vcmd = printf('%s -s --noplugin --servername %s --remote-expr %s',
+                        \ g:clang_vim_exec, shellescape(v:servername), shellescape(l:keys))
+      let l:input = tempname()
+      call writefile(split(l:src, "\n"), l:input)
+      let l:command = 'type '.l:input.' | '.l:command.' && '.l:vcmd
+      call s:PDebug("s:ClangExecute::cmd", l:command, 2)
+      silent exe "!start /min cmd /c ".l:command
+    else
+      let l:keys = printf('ClangExecuteDone("%s","%s")', l:tmps[0], l:tmps[1])
+      let l:vcmd = printf('%s -s --noplugin --servername %s --remote-expr %s',
+                        \ g:clang_vim_exec, shellescape(v:servername), shellescape(l:keys))
+      let l:command = '('.l:command.';'.l:vcmd.') &'
+      call s:PDebug("s:ClangExecute::cmd", l:command, 2)
+      call system(l:command, l:src)
+    endif
   endif
   exe 'lcd ' . l:cwd
-  let b:clang_state['stdout'] = l:res[0]
-  let b:clang_state['stderr'] = l:res[1]
   return l:res
 endf
 "}}}
