@@ -100,7 +100,13 @@ au FileType c,cpp call <SID>ClangCompleteInit(0)
 " A new file is also a valid file
 func! s:IsValidFile()
   let l:cur = expand("%")
-  return ( &filetype == "c" || &filetype == "cpp" ) && ( filereadable(l:cur) || empty(glob(l:cur)) )
+  " don't load plugin when in fugitive buffer
+  if l:cur =~ 'fugitive:///'
+    return 0
+  endif
+  " Please don't use filereadable to test, as the new created file is also 
+  " unreadable before writting to disk.
+  return &filetype == "c" || &filetype == "cpp"
 endf
 "}}}
 "{{{ s:PDebug
@@ -162,6 +168,9 @@ endf
 " {{{ s:BufVarRestore
 " Restore global vim options
 func! s:BufVarRestore()
+  if !exists('b:clang_bufvars_storage')
+    return
+  endif
   exe 'set completeopt='.b:clang_bufvars_storage['completeopt']
 endf
 " }}}
