@@ -167,7 +167,9 @@ endf
 " {{{ s:BufVarRestore
 " Restore global vim options
 func! s:BufVarRestore()
-  exe 'set completeopt='.b:clang_bufvars_storage['completeopt']
+  if exists('b:clang_bufvars_storage')
+    exe 'set completeopt='.b:clang_bufvars_storage['completeopt']
+  endif
 endf
 " }}}
 " {{{ s:Complete[Dot|Arrow|Colon]
