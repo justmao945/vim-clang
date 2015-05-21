@@ -961,7 +961,7 @@ func! s:ClangExecute(root, clang_options, line, col)
                         \ g:clang_vim_exec, shellescape(v:servername), shellescape(l:keys))
       let l:input = tempname()
       call writefile(split(l:src, "\n"), l:input)
-      let l:command = 'type '.l:input.' | '.l:command.' && '.l:vcmd
+      let l:command = 'type '.l:input.' | '.l:command.' & '.l:vcmd
       call s:PDebug("s:ClangExecute::cmd", l:command, 2)
       silent exe "!start /min cmd /c ".l:command
     else
