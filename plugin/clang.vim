@@ -916,8 +916,6 @@ func! s:ClangExecute(root, clang_options, line, col)
   " longer version, redirect output to different files
   let l:command = l:cmd.' 1>'.l:tmps[0].' 2>'.l:tmps[1]
   let l:res = [[], []]
-  let b:clang_state['stdout'] = l:res[0]
-  let b:clang_state['stderr'] = l:res[1]
   if has("nvim")
     call s:PDebug("s:ClangExecute::cmd", l:cmd, 2)
     " try to force stop last job which doesn't exit.
@@ -974,6 +972,8 @@ func! s:ClangExecute(root, clang_options, line, col)
     endif
   endif
   exe 'lcd ' . l:cwd
+  let b:clang_state['stdout'] = l:res[0]
+  let b:clang_state['stderr'] = l:res[1]
   return l:res
 endf
 "}}}
