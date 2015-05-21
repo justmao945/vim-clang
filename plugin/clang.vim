@@ -955,13 +955,13 @@ func! s:ClangExecute(root, clang_options, line, col)
     " Please note that '--remote-expr' executes expressions in server, but
     " '--remote-send' only sends keys, which is same as type keys in server...
     " Here occurs a bug if uses '--remote-send', the 'col(".")' is not right.
-    if s:is_windows
+    if g:clang_sh_exec == &shell
       let l:keys = printf("ClangExecuteDone('%s','%s')", l:tmps[0], l:tmps[1])
       let l:vcmd = printf('%s -s --noplugin --servername %s --remote-expr %s',
                         \ g:clang_vim_exec, shellescape(v:servername), shellescape(l:keys))
       let l:input = tempname()
-      call writefile(split(l:src, "\n"), l:input)
-      let l:command = 'type '.l:input.' | '.l:command.' & '.l:vcmd
+      call writefile(split(l:src, "\n", 1), l:input)
+      let l:command = 'type '.shellescape(l:input).' | '.l:command.' & del '.shellescape(l:input).' & '.l:vcmd
       call s:PDebug("s:ClangExecute::cmd", l:command, 2)
       silent exe "!start /min cmd /c ".l:command
     else
