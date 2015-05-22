@@ -76,10 +76,7 @@ find that's too 'slow' to wait the completion...
 * This mode is implemented by starting another vim process to notify the finish of the
    completion, so `+clientserver` option is required to compile the vim(generally added).
 
-* Please note that if you start vim from a terminal, and work as the non-GUI mode, such
-  as execute 'vim' to spawn the edit, default it does not act as a server. Instead, you
-  can start Gvim to work as a server or you must add '--servername XXX' to force to start
-  a vim server. More to see ':h clientserver'.
+* GVIM is required to use this mode, seems given `--servername ???` to `vim` is not working.
 
 * Job control is used to run clang when in neovim, which is really very nice! Thank you 
   [syswow][6].
