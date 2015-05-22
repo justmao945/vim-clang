@@ -1012,10 +1012,9 @@ func! s:ClangExecuteDoneTriggerCompletion()
   let b:clang_state['state'] = 'sync'
   call s:PDebug("ClangExecuteDoneTriggerCompletion::stdout", b:clang_state['stdout'], 3)
   call s:PDebug("ClangExecuteDoneTriggerCompletion::stderr", b:clang_state['stderr'], 2)
-  call feedkeys("\<Esc>a")
   " As the default action of <C-x><C-o> causes a 'pattern not found'
   " when the result is empty, which break our input, that's really painful...
-  if ! empty(b:clang_state['stdout'])
+  if ! empty(b:clang_state['stdout']) && mode() == 'i'
     call feedkeys("\<C-x>\<C-o>")
   else
     call ClangComplete(0, ClangComplete(1, 0))
