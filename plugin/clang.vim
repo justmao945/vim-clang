@@ -4,7 +4,7 @@ if exists('g:clang_loaded')
 endif
 let g:clang_loaded = 1
 
-let s:is_windows = has('win16') || has('win32') || has('win64') || has('win95')
+let g:clang_has_win = has('win16') || has('win32') || has('win64') || has('win95')
 
 if !exists('g:clang_auto')
   let g:clang_auto = 1
@@ -71,12 +71,13 @@ if !exists('g:clang_pwheight')
 endif
 
 if !exists('g:clang_sh_exec')
-  if s:is_windows
-    let g:clang_sh_exec = &shell
+  if g:clang_has_win
+    let g:clang_sh_exec = 'C:\Windows\system32\cmd.exe'
   else
     let g:clang_sh_exec = 'sh'
   endif
 endif
+let g:clang_sh_is_cmd = g:clang_sh_exec =~ 'cmd.exe'
 
 if !exists('g:clang_statusline')
   let g:clang_statusline='%s\ \|\ %%l/\%%L\ \|\ %%p%%%%'
@@ -257,12 +258,8 @@ endf
 " @options Additional options passed to clang, e.g. -stdlib=libc++
 " @return List of dirs: ['path1', 'path2', ...]
 func! s:DiscoverIncludeDirs(clang, options)
-  if s:is_windows
-    let l:command = 'type NUL | '
-  else
-    let l:command = 'echo | '
-  endif
-  let l:command .= printf('%s -fsyntax-only -v %s - 2>&1', a:clang, a:options)
+  let l:echo = g:clang_sh_is_cmd ? 'type NUL' : 'echo'
+  let l:command = printf('%s | %s -fsyntax-only -v %s - 2>&1', l:echo, a:clang, a:options)
   call s:PDebug("s:DiscoverIncludeDirs::cmd", l:command, 2)
   let l:clang_output = split(system(l:command), "\n")
   call s:PDebug("s:DiscoverIncludeDirs::raw", l:clang_output, 3)
@@ -932,8 +929,9 @@ func! s:ClangExecute(root, clang_options, line, col)
         " Ignore
       endtry
     endif
-
-    let l:argv = [g:clang_sh_exec, '-c', l:cmd]
+    
+    let l:optc = g:clang_sh_is_cmd ? '/c' : '-c'
+    let l:argv = [g:clang_sh_exec, l:optc, l:cmd]
     " FuncRef must start with cap var
     let l:Handler = function('ClangExecuteNeoJobHandler')
     let l:opts = {'on_stdout': l:Handler, 'on_stderr': l:Handler, 'on_exit': l:Handler}
@@ -959,23 +957,20 @@ func! s:ClangExecute(root, clang_options, line, col)
     " Please note that '--remote-expr' executes expressions in server, but
     " '--remote-send' only sends keys, which is same as type keys in server...
     " Here occurs a bug if uses '--remote-send', the 'col(".")' is not right.
-    if g:clang_sh_exec == &shell
-      let l:keys = printf("ClangExecuteDone('%s','%s')", l:tmps[0], l:tmps[1])
-      let l:vcmd = printf('%s -s --noplugin --servername %s --remote-expr %s',
-                        \ g:clang_vim_exec, shellescape(v:servername), shellescape(l:keys))
+    let l:keys = printf("ClangExecuteDone('%s','%s')", l:tmps[0], l:tmps[1])
+    let l:vcmd = printf('%s -s --noplugin --servername %s --remote-expr %s',
+          \ g:clang_vim_exec, shellescape(v:servername), shellescape(l:keys))
+    if g:clang_sh_is_cmd
       let l:input = tempname()
       call writefile(split(l:src, "\n", 1), l:input)
-      let l:command = 'type '.shellescape(l:input).' | '.l:command.' & del '.shellescape(l:input).' & '.l:vcmd
-      call s:PDebug("s:ClangExecute::cmd", l:command, 2)
-      silent exe "!start /min cmd /c ".l:command
+      let l:input = shellescape(l:input)
+      let l:acmd = printf('type %s | %s & del %s & %s', l:input, l:command, l:input, l:vcmd)
+      silent exe "!start /min cmd /c ".l:acmd
     else
-      let l:keys = printf('ClangExecuteDone("%s","%s")', l:tmps[0], l:tmps[1])
-      let l:vcmd = printf('%s -s --noplugin --servername %s --remote-expr %s',
-                        \ g:clang_vim_exec, shellescape(v:servername), shellescape(l:keys))
-      let l:command = '('.l:command.';'.l:vcmd.') &'
-      call s:PDebug("s:ClangExecute::cmd", l:command, 2)
-      call system(l:command, l:src)
+      let l:acmd = printf('(%s;%s)&', l:command, l:vcmd)
+      call system(l:acmd, l:src)
     endif
+    call s:PDebug("s:ClangExecute::cmd", l:command, 2)
   endif
   exe 'lcd ' . l:cwd
   let b:clang_state['stdout'] = l:res[0]
