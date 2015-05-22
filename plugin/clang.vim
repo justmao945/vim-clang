@@ -966,11 +966,18 @@ func! s:ClangExecute(root, clang_options, line, col)
       let l:input = shellescape(l:input)
       let l:acmd = printf('type %s | %s & del %s & %s', l:input, l:command, l:input, l:vcmd)
       silent exe "!start /min cmd /c ".l:acmd
+      let l:acmd_output = ''
     else
       let l:acmd = printf('(%s;%s)&', l:command, l:vcmd)
-      call system(l:acmd, l:src)
+      let l:acmd_output = system(l:acmd, l:src)
     endif
     call s:PDebug("s:ClangExecute::cmd", l:acmd, 2)
+    if v:shell_error
+      if !empty(l:acmd_output)
+        call s:DiagnosticsWindowOpen('', split(l:acmd_output, '\n'))
+      endif
+      call s:PError('s:ClangExecute::acmd', 'execute async command failed')
+    endif
   endif
   exe 'lcd ' . l:cwd
   let b:clang_state['stdout'] = l:res[0]
