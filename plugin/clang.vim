@@ -74,7 +74,8 @@ if !exists('g:clang_sh_exec')
   if g:clang_has_win
     let g:clang_sh_exec = 'C:\Windows\system32\cmd.exe'
   else
-    let g:clang_sh_exec = 'sh'
+    " sh default is dash on Ubuntu, which is unsupported
+    let g:clang_sh_exec = 'bash'
   endif
 endif
 let g:clang_sh_is_cmd = g:clang_sh_exec =~ 'cmd.exe'
