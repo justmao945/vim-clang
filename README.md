@@ -91,8 +91,10 @@ Options and Commands
 
 OS requirement
 --------------------
-Now only tested on Linux (Ubuntu/Debian) and Mac OSX
-
+Tested on
+* Ubuntu 14.04
+* Mac OS X 10.10
+* Windows 7
 
 [1]: https://github.com/Rip-Rip/clang_complete
 [2]: http://www.ishani.org
