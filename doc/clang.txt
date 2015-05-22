@@ -180,7 +180,10 @@ g:clang_pwheight                        *g:clang_pwheight*
 g:clang_sh_exec                         *g:clang_sh_exec*
         Set |shell| before execute command.
     Default: >
-        let g:clang_sh_exec = 'sh'
+        " on windows
+        let g:clang_sh_exec = 'C:\Windows\system32\cmd.exe'
+        " otherwise
+        let g:clang_sh_exec = 'bash' 
 <
 g:clang_statusline                      *g:clang_statusline*
         Status line showed in preview window and diagnostics window.
@@ -272,6 +275,10 @@ A: Please use with neocomplete, they can work well together.
 
 ==============================================================================
 CHANGELOG                                        *clang-changelog*
+0.4.1
+* support Windows
+* bug fix
+
 0.4.0
 * improve job control for neovim [syswow]
 * support auto-close diagnostics window when leave
@@ -332,6 +339,7 @@ CREDITS                                          *clang-credits*
 Thanks to following people for suggestions and patches:
 * adelarsq
 * jreybert
+* mattn
 * mlen
 * RageCooky
 * syswow
