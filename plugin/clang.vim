@@ -970,7 +970,7 @@ func! s:ClangExecute(root, clang_options, line, col)
       let l:acmd = printf('(%s;%s)&', l:command, l:vcmd)
       call system(l:acmd, l:src)
     endif
-    call s:PDebug("s:ClangExecute::cmd", l:command, 2)
+    call s:PDebug("s:ClangExecute::cmd", l:acmd, 2)
   endif
   exe 'lcd ' . l:cwd
   let b:clang_state['stdout'] = l:res[0]
