@@ -1015,7 +1015,7 @@ func! s:ClangExecuteDoneTriggerCompletion()
   " As the default action of <C-x><C-o> causes a 'pattern not found'
   " when the result is empty, which break our input, that's really painful...
   if ! empty(b:clang_state['stdout']) && mode() == 'i'
-    call feedkeys("\<C-x>\<C-o>")
+    call feedkeys("\<C-x>\<C-o>", "t")
   else
     call ClangComplete(0, ClangComplete(1, 0))
   endif
