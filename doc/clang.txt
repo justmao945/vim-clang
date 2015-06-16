@@ -265,6 +265,7 @@ A: Please use with neocomplete, they can work well together.
         if !exists('g:neocomplete#force_omni_input_patterns')
           let g:neocomplete#force_omni_input_patterns = {}
         endif
+        let g:neocomplete#force_overwrite_completefunc = 1
         
         " for c and c++
         let g:neocomplete#force_omni_input_patterns.c =
