@@ -46,6 +46,10 @@ if !exists('g:clang_exec')
   let g:clang_exec = 'clang'
 endif
 
+if !exists('g:gcc_exec')
+  let g:gcc_exec = 'gcc'
+endif
+
 if !exists('g:clang_format_auto')
   let g:clang_format_auto = 0
 endif
@@ -767,6 +771,9 @@ func! s:ClangCompleteInit(force)
   " add include directories if is enabled and not ow
   if g:clang_include_sysheaders && ! l:is_ow
     let l:incs = s:DiscoverIncludeDirs(g:clang_exec, b:clang_options)
+    if g:clang_has_win
+      let l:incs += s:DiscoverIncludeDirs(g:gcc_exec, b:clang_options)
+    endif
     for l:dir in l:incs
       let b:clang_options .= ' -I ' . shellescape(l:dir)
     endfor
@@ -792,6 +799,9 @@ func! s:ClangCompleteInit(force)
     let g:neocomplete#sources#include#paths = {}
   endif
   let l:incs = s:DiscoverIncludeDirs(g:clang_exec, b:clang_options)
+  if g:clang_has_win
+    let l:incs += s:DiscoverIncludeDirs(g:gcc_exec, b:clang_options)
+  endif
   " FIXME: should not overwrite?
   let g:neocomplete#sources#include#paths[&filetype] = join(l:incs, ',')
 
