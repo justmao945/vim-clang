@@ -143,11 +143,12 @@ g:clang_exec                            *g:clang_exec*
     Default: >
         let g:clang_exec = 'clang'
 
-g:gcc_exec                              *g:gcc_exec*
+g:clang_gcc_exec                        *g:clang_gcc_exec*
         Name or path of executable gcc. Use this if gcc has a
-        non-standard name, or isn't in the path.
+        non-standard name, or isn't in the path. It's used to search the
+        system default include directories of gcc in Windows.
     Default: >
-        let g:gcc_exec = 'gcc'
+        let g:clang_gcc_exec = 'gcc'
 <
 g:clang_format_auto                     *g:clang_format_auto*
         If equals to 1, automatically format current file when save file.
