@@ -10,6 +10,10 @@ if !exists('g:clang_auto')
   let g:clang_auto = 1
 endif
 
+if !exists('g:clang_compilation_database')
+  let g:clang_compilation_database = ''
+endif
+
 if !exists('g:clang_c_options')
   let g:clang_c_options = ''
 endif
@@ -30,8 +34,10 @@ if !exists('g:clang_debug')
   let g:clang_debug = 0
 endif
 
-if !exists('g:clang_diagsopt') || g:clang_diagsopt !~# '^[a-z]\+\(:[0-9]\)\?$'
-  let g:clang_diagsopt = 'rightbelow:6'
+if !exists('g:clang_diagsopt') 
+  if g:clang_diagsopt !~# '^[a-z]\+\(:[0-9]\)\?$'
+    let g:clang_diagsopt = 'rightbelow:6'
+  endif
 endif
 
 if !exists('g:clang_dotfile')
@@ -305,6 +311,10 @@ endf
 " @diags A list of lines from clang diagnostics, or a diagnostics file name.
 " @return -1 or buffer number t:clang_diags_bufnr
 func! s:DiagnosticsWindowOpen(src, diags)
+  if g:clang_diagsopt ==# ''
+    return
+  endif
+
   let l:diags = a:diags
   if type(l:diags) == type('')
     " diagnostics file name
@@ -726,26 +736,60 @@ func! s:ClangCompleteInit(force)
 
   " Firstly, add clang options for current buffer file
   let b:clang_options = ''
-
   let l:is_ow = 0
-  if filereadable(l:dotclangow)
-    let l:is_ow = 1
-    let l:dotclang = l:dotclangow
-  endif
+  if g:clang_compilation_database !=# ''
+    let l:ccd = fnameescape(fnamemodify(
+          \ g:clang_compilation_database . '/compile_commands.json', '%:p'))
+    let b:clang_root = fnameescape(fnamemodify(
+          \ g:clang_compilation_database, ':p:h'))
 
-  " clang root(aka .clang located directory) for current buffer
-  if filereadable(l:dotclang)
-    let b:clang_root = fnameescape(fnamemodify(l:dotclang, ':p:h'))
-    let l:opts = readfile(l:dotclang)
-    for l:opt in l:opts
-      if l:opt =~ "^[ \t]*//"
-        continue
-      endif
-      let b:clang_options .= ' ' . l:opt
-    endfor
+    call s:PDebug("s:ClangCompleteInit::database", l:ccd)
+    if filereadable(l:ccd)
+python << endpython
+import vim
+import re
+import json
+
+current = vim.eval("expand('%:p')")
+ccd = vim.eval("l:ccd")
+opts = ''
+
+with open(ccd) as database:
+  data = json.load(database)
+
+  for d in data:
+    # hax for headers
+    fmatch = re.search(r'(.*)\.(\w+)$', current)
+    dmatch = re.search(r'(.*)\.(\w+)$', d['file'])
+
+    if fmatch.group(1) == dmatch.group(1):
+      match = re.search(r'^([^\s]+)(.*)-o', d['command'])
+      opts = re.sub(r'\s+', ' ', match.group(2))
+      break
+
+vim.command("let b:clang_options .= '" + opts + "'")
+endpython
+    endif
   else
-    " or means source file directory
-    let b:clang_root = l:fwd
+    if filereadable(l:dotclangow)
+      let l:is_ow = 1
+      let l:dotclang = l:dotclangow
+    endif
+
+    " clang root(aka .clang located directory) for current buffer
+    if filereadable(l:dotclang)
+      let b:clang_root = fnameescape(fnamemodify(l:dotclang, ':p:h'))
+      let l:opts = readfile(l:dotclang)
+      for l:opt in l:opts
+        if l:opt =~ "^[ \t]*//"
+          continue
+        endif
+        let b:clang_options .= ' ' . l:opt
+      endfor
+    else
+      " or means source file directory
+      let b:clang_root = l:fwd
+    endif
   endif
 
   " Secondly, add options defined by user if is not ow
