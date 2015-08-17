@@ -83,9 +83,9 @@ find that's too 'slow' to wait the completion...
 
 Compile commands [new]
 --------------------
-* Use cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=1 to generate compile_commands.json
+* Use `cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=1` to generate `compile_commands.json`
 
-* To use the compile commands database in vim-clang, set the g:clang_compilation_database
+* To use the compile commands database in vim-clang, set the `g:clang_compilation_database`
 variable in your vimrc to your cmake build path.
 
         let g:clang_compilation_database = './build'
