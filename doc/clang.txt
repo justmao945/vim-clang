@@ -220,6 +220,11 @@ g:clang_vim_exec                        *g:clang_vim_exec*
         " Mac OSX
         let g:clang_vim_exec = 'mvim'
 <
+g:clang_compilation_database            *g:clang_compilation_database*
+        Path to be used for the compile commands database.
+    Default: >
+        let g:clang_compilation_database = ''
+<
 ==============================================================================
 COMMANDS                                         *clang-commands*
 
