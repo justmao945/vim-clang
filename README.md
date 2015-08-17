@@ -81,6 +81,14 @@ find that's too 'slow' to wait the completion...
 * Job control is used to run clang when in neovim, which is really very nice! Thank you 
   [syswow][6].
 
+Compile commands [new]
+--------------------
+* Use cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=1 to generate compile_commands.json
+
+* To use the compile commands database in vim-clang, set the g:clang_compilation_database
+variable in your vimrc to your cmake build path.
+
+        let g:clang_compilation_database = './build'
 
 Options and Commands
 --------------------
