@@ -34,10 +34,8 @@ if !exists('g:clang_debug')
   let g:clang_debug = 0
 endif
 
-if !exists('g:clang_diagsopt') 
-  if g:clang_diagsopt !~# '^[a-z]\+\(:[0-9]\)\?$'
-    let g:clang_diagsopt = 'rightbelow:6'
-  endif
+if !exists('g:clang_diagsopt') || (!empty(g:clang_diagsopt) && g:clang_diagsopt !~# '^[a-z]\+\(:[0-9]\)\?$')
+  let g:clang_diagsopt = 'rightbelow:6'
 endif
 
 if !exists('g:clang_dotfile')
