@@ -706,7 +706,7 @@ import json
 
 current = vim.eval("expand('%:p')")
 ccd = vim.eval("l:ccd")
-opts = ''
+opts = []
 
 with open(ccd) as database:
   data = json.load(database)
@@ -717,11 +717,11 @@ with open(ccd) as database:
     dmatch = re.search(r'(.*)\.(\w+)$', d['file'])
 
     if fmatch.group(1) == dmatch.group(1):
-      match = re.search(r'^([^\s]+)(.*)-o', d['command'])
-      opts = re.sub(r'\s+', ' ', match.group(2))
+      for result in re.finditer(r'-[ID]\s*[^\s]+', d['command']):
+        opts.append(result.group(0))
       break
 
-vim.command("let l:clang_options = '" + opts + "'")
+vim.command("let l:clang_options = '" + ' '.join(opts) + "'")
 endpython
     endif
   endif
