@@ -50,6 +50,10 @@ if !exists('g:clang_exec')
   let g:clang_exec = 'clang'
 endif
 
+if !exists('g:clang_gcc_exec')
+  let g:clang_gcc_exec = 'gcc'
+endif
+
 if !exists('g:clang_format_auto')
   let g:clang_format_auto = 0
 endif
@@ -64,6 +68,10 @@ end
 
 if !exists('g:clang_include_sysheaders')
   let g:clang_include_sysheaders = 1
+endif
+
+if !exists('g:clang_include_sysheaders_from_gcc')
+  let g:clang_include_sysheaders_from_gcc = 0
 endif
 
 if !exists('g:clang_load_if_clang_dotfile')
@@ -294,6 +302,20 @@ func! s:DiscoverIncludeDirs(clang, options)
   call s:PDebug("s:DiscoverIncludeDirs::parsed", l:res, 2)
   return l:res
 endf
+"}}}
+"{{{ s:DiscoverDefaultIncludeDirs
+" Discover default include directories of clang and gcc (if existed).
+" @options Additional options passed to clang and gcc, e.g. -stdlib=libc++
+" @return List of dirs: ['path1', 'path2', ...]
+func! s:DiscoverDefaultIncludeDirs(options)
+  if g:clang_include_sysheaders_from_gcc
+    let l:res = s:DiscoverIncludeDirs(g:clang_gcc_exec, a:options)
+  else
+    let l:res = s:DiscoverIncludeDirs(g:clang_exec, a:options)
+  endif
+  call s:PDebug("s:DiscoverDefaultIncludeDirs", l:res, 2)
+  return l:res
+endfunc
 "}}}
 "{{{ s:DiagnosticsWindowOpen
 " Split a window to show clang diagnostics. If there's no diagnostics, close
@@ -816,9 +838,9 @@ func! s:ClangCompleteInit(force)
   let b:clang_options .= ' -I ' . shellescape(expand("%:p:h"))
 
   " add include directories if is enabled and not ow
+  let l:default_incs = s:DiscoverDefaultIncludeDirs(b:clang_options)
   if g:clang_include_sysheaders && ! l:is_ow
-    let l:incs = s:DiscoverIncludeDirs(g:clang_exec, b:clang_options)
-    for l:dir in l:incs
+    for l:dir in l:default_incs
       let b:clang_options .= ' -I ' . shellescape(l:dir)
     endfor
   endif
@@ -842,9 +864,8 @@ func! s:ClangCompleteInit(force)
   if !exists('g:neocomplete#sources#include#paths')
     let g:neocomplete#sources#include#paths = {}
   endif
-  let l:incs = s:DiscoverIncludeDirs(g:clang_exec, b:clang_options)
   " FIXME: should not overwrite?
-  let g:neocomplete#sources#include#paths[&filetype] = join(l:incs, ',')
+  let g:neocomplete#sources#include#paths[&filetype] = join(l:default_incs, ',')
 
   " backup options without PCH support
   let b:clang_options_noPCH = b:clang_options
