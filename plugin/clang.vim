@@ -860,13 +860,6 @@ func! s:ClangCompleteInit(force)
     endfor
   endif
 
-  " discover include directories *again* for neocomplete.
-  if !exists('g:neocomplete#sources#include#paths')
-    let g:neocomplete#sources#include#paths = {}
-  endif
-  " FIXME: should not overwrite?
-  let g:neocomplete#sources#include#paths[&filetype] = join(l:default_incs, ',')
-
   " backup options without PCH support
   let b:clang_options_noPCH = b:clang_options
   " try to find PCH files in clang_root and clang_root/include
