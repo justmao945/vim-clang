@@ -146,7 +146,7 @@ g:clang_exec                            *g:clang_exec*
 g:clang_gcc_exec                        *g:clang_gcc_exec*
         Name or path of executable gcc. Use this if gcc has a
         non-standard name, or isn't in the path. It's used to search the
-        system default include directories of gcc in Windows.
+        system default include directories of gcc.
     Default: >
         let g:clang_gcc_exec = 'gcc'
 <
@@ -171,6 +171,13 @@ g:clang_include_sysheaders              *g:clang_include_sysheaders*
         Set 0 to disable it.
     Default: >
         let g:clang_include_sysheaders = 1
+<
+g:clang_include_sysheaders_from_gcc     *g:clang_include_sysheaders_from_gcc*
+        Discover default system C/C++ headers automatically for g:clang_gcc_exec
+        instead of g:clang_exec.
+        Set 1 to enable it.
+    Default: >
+        let g:clang_include_sysheaders = 0
 <
 g:clang_load_if_clang_dotfile           g:clang_load_if_clang_dotfile
         If equals to 1, this plugin will be loaded only if g:clang_dotfile or
