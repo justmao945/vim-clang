@@ -70,6 +70,10 @@ if !exists('g:clang_include_sysheaders')
   let g:clang_include_sysheaders = 1
 endif
 
+if !exists('g:clang_include_sysheaders_from_gcc')
+  let g:clang_include_sysheaders_from_gcc = 0
+endif
+
 if !exists('g:clang_load_if_clang_dotfile')
   let g:clang_load_if_clang_dotfile = 0
 endif
@@ -106,10 +110,6 @@ if !exists('g:clang_vim_exec')
   else
     let g:clang_vim_exec = 'vim'
   endif
-endif
-
-if !exists('g:clang_include_sysheaders_from_gcc')
-  let g:clang_include_sysheaders_from_gcc = g:clang_has_win && executable(g:clang_gcc_exec)
 endif
 
 " Init on c/c++ files
@@ -308,17 +308,13 @@ endf
 " @options Additional options passed to clang and gcc, e.g. -stdlib=libc++
 " @return List of dirs: ['path1', 'path2', ...]
 func! s:DiscoverDefaultIncludeDirs(options)
-  let l:res = s:DiscoverIncludeDirs(g:clang_exec, a:options)
   if g:clang_include_sysheaders_from_gcc
-    let l:res += s:DiscoverIncludeDirs(g:clang_gcc_exec, a:options)
+    let l:res = s:DiscoverIncludeDirs(g:clang_gcc_exec, a:options)
+  else
+    let l:res = s:DiscoverIncludeDirs(g:clang_exec, a:options)
   endif
-  let d = {}
-  for l:dir in l:res
-    let d[l:dir] = ''
-  endfor
-  let l:merged = sort(keys(d))
-  call s:PDebug("s:DiscoverDefaultIncludeDirs::merged", l:merged, 2)
-  return l:merged
+  call s:PDebug("s:DiscoverDefaultIncludeDirs", l:res, 2)
+  return l:res
 endfunc
 "}}}
 "{{{ s:DiagnosticsWindowOpen
