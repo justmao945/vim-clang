@@ -887,7 +887,7 @@ func! s:ClangCompleteInit(force)
   com! ClangSyntaxCheck call <SID>ClangSyntaxCheck(b:clang_root, b:clang_options)
 
   " Useful to format source code
-  com! ClangFormat call <SID>ClangFormat('%')
+  com! ClangFormat call <SID>ClangFormat()
 
   if g:clang_auto   " Auto completion
     inoremap <expr> <buffer> . <SID>CompleteDot()
@@ -1102,9 +1102,11 @@ endf
 " }}}
 " {{{ s:ClangFormat
 " Call clang-format to format source code
-func! s:ClangFormat(file)
-  let l:command = printf("%s -i -style=%s %s", g:clang_format_exec, g:clang_format_style, expand(a:file))
-  call system(l:command)
+func! s:ClangFormat()
+  let l:view = winsaveview()
+  let l:command = printf("%s -style=%s ", g:clang_format_exec, g:clang_format_style)
+  silent execute '%!'. l:command
+  call winrestview(l:view)
 endf
 "}}}
 "{{{ ClangComplete
