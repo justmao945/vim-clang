@@ -177,7 +177,7 @@ g:clang_include_sysheaders_from_gcc     *g:clang_include_sysheaders_from_gcc*
         instead of g:clang_exec.
         Set 1 to enable it.
     Default: >
-        let g:clang_include_sysheaders = 0
+        let g:clang_include_sysheaders_from_gcc = 0
 <
 g:clang_load_if_clang_dotfile           g:clang_load_if_clang_dotfile
         If equals to 1, this plugin will be loaded only if g:clang_dotfile or
