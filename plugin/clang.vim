@@ -554,14 +554,14 @@ endf
 " {{{ s:HasPreviewAbove
 " Detect above view is preview window or not.
 func! s:HasPreviewAbove()
-  let l:cbuf = bufnr('%')
+  let l:cwin = winnr()
   let l:has = 0
   " goto above
   wincmd k
   if &completeopt =~ 'preview' && &previewwindow
     let l:has = 1
   endif
-  exe bufwinnr(l:cbuf) . 'wincmd w'
+  exe l:cwin . 'wincmd w'
   return l:has
 endf
 "}}}
@@ -680,7 +680,7 @@ func! s:ShrinkPrevieWindow()
   endif
 
   "current view
-  let l:cbuf = bufnr('%')
+  let l:cwin = winnr()
   let l:cft  = &filetype
   " go to above view
   wincmd k
@@ -705,7 +705,7 @@ func! s:ShrinkPrevieWindow()
   endif
 
   " back to current window
-  exe bufwinnr(l:cbuf) . 'wincmd w'
+  exe l:cwin . 'wincmd w'
 endf
 "}}}
 "{{{ s:ClangCompleteDatabase
