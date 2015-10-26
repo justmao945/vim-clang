@@ -676,7 +676,8 @@ endf
 " Set neomake_{c,cpp}_{clang,gcc}_maker variables to add the Clang arguments
 " parsed from the .clang or .clang.ow files.
 " @clang_options the options to be passed to makers
-func! s:SetNeomakeMakerArguments(clang_options)
+" @clang_root the directory whence the maker must be executed
+func! s:SetNeomakeMakerArguments(clang_options, clang_root)
   " Split the arguments into a list
   let l:clang_options = split(a:clang_options, " ")
 
@@ -691,6 +692,7 @@ func! s:SetNeomakeMakerArguments(clang_options)
     else
       let g:neomake_cpp_clang_maker["args"] = l:clang_options
     endif
+    let g:neomake_cpp_clang_maker["cwd"] = a:clang_root
 
     if !exists('g:neomake_cpp_gcc_maker')
       let g:neomake_cpp_gcc_maker = {
@@ -701,6 +703,7 @@ func! s:SetNeomakeMakerArguments(clang_options)
     else
       let g:neomake_cpp_gcc_maker["args"] = l:clang_options
     endif
+    let g:neomake_cpp_gcc_maker["cwd"] = a:clang_root
 
   elseif &filetype == 'c'
     if !exists('g:neomake_c_clang_maker')
@@ -712,6 +715,7 @@ func! s:SetNeomakeMakerArguments(clang_options)
     else
       let g:neomake_c_clang_maker["args"] = l:clang_options
     endif
+    let g:neomake_c_clang_maker["cwd"] = a:clang_root
 
     if !exists('g:neomake_c_gcc_maker')
       let g:neomake_c_gcc_maker = {
@@ -722,6 +726,7 @@ func! s:SetNeomakeMakerArguments(clang_options)
     else
       let g:neomake_c_gcc_maker["args"] = l:clang_options
     endif
+    let g:neomake_c_gcc_maker["cwd"] = a:clang_root
 
   endif
 endf
@@ -986,7 +991,7 @@ func! s:ClangCompleteInit(force)
   endif
 
 	" Set the configuration variables for Neomake makers
-  call s:SetNeomakeMakerArguments(b:clang_options)
+  call s:SetNeomakeMakerArguments(b:clang_options, b:clang_root)
 
   call s:GlobalVarRestore(l:gvars)
 endf
@@ -1280,4 +1285,4 @@ func! s:ClangComplete(findstart, base)
 endf
 "}}}
 
-" vim: set shiftwidth=2 softtabstop=2 tabstop=2 foldmethod=marker:
+" vim: set shiftwidth=2 softtabstop=2 tabstop=2 expandtab foldmethod=marker:
