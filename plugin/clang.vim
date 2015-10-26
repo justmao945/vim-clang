@@ -66,6 +66,10 @@ if !exists('g:clang_format_style')
   let g:clang_format_style = 'LLVM'
 end
 
+if !exists('g:clang_check_syntax_auto')
+	let g:clang_check_syntax_auto = 0
+endif
+
 if !exists('g:clang_include_sysheaders')
   let g:clang_include_sysheaders = 1
 endif
@@ -123,7 +127,7 @@ func! s:IsValidFile()
   if l:cur =~ 'fugitive:///'
     return 0
   endif
-  " Please don't use filereadable to test, as the new created file is also 
+  " Please don't use filereadable to test, as the new created file is also
   " unreadable before writting to disk.
   return &filetype == "c" || &filetype == "cpp"
 endf
@@ -132,7 +136,7 @@ endf
 " Use `:messages` to see debug info or read the var `b:clang_pdebug_storage`
 " TODO: pretty print of info and write b:clang_pdebug_storage to new buffer,
 " file, or someother places...
-" 
+"
 " Buffer var used to store messages
 "   b:clang_pdebug_storage
 "
@@ -276,7 +280,7 @@ func! s:DiscoverIncludeDirs(clang, options)
   call s:PDebug("s:DiscoverIncludeDirs::cmd", l:command, 2)
   let l:clang_output = split(system(l:command), "\n")
   call s:PDebug("s:DiscoverIncludeDirs::raw", l:clang_output, 3)
-  
+
   let l:i = 0
   let l:hit = 0
   for l:line in l:clang_output
@@ -287,7 +291,7 @@ func! s:DiscoverIncludeDirs(clang, options)
     endif
     let l:i += 1
   endfor
-  
+
   let l:clang_output = l:clang_output[l:i : -1]
   let l:res = []
   for l:line in l:clang_output
@@ -343,7 +347,7 @@ func! s:DiagnosticsWindowOpen(src, diags)
     call s:PError("s:DiagnosticsWindowOpen", 'Invalid arg ' . string(l:diags))
     return -1
   endif
-  
+
   let l:i = stridx(g:clang_diagsopt, ':')
   let l:mode      = g:clang_diagsopt[0 : l:i-1]
   let l:maxheight = g:clang_diagsopt[l:i+1 : -1]
@@ -400,12 +404,12 @@ func! s:DiagnosticsWindowOpen(src, diags)
 
   " goto the 1st line
   silent 1
-    
+
   setl buftype=nofile bufhidden=hide
   setl noswapfile nobuflisted nowrap nonumber nospell nomodifiable winfixheight winfixwidth
   setl cursorline
   setl colorcolumn=-1
-  
+
   " Don't use indentLine in the diagnostics window
   " See https://github.com/Yggdroot/indentLine.git
   if exists('b:indentLine_enabled') && b:indentLine_enabled
@@ -416,7 +420,7 @@ func! s:DiagnosticsWindowOpen(src, diags)
   syn match ClangSynDiagsWarning  display 'warning:'
   syn match ClangSynDiagsNote     display 'note:'
   syn match ClangSynDiagsPosition display '^\s*[~^ ]\+$'
-  
+
   hi ClangSynDiagsError           guifg=Red     ctermfg=9
   hi ClangSynDiagsWarning         guifg=Magenta ctermfg=13
   hi ClangSynDiagsNote            guifg=Gray    ctermfg=8
@@ -489,7 +493,7 @@ endf
 " @clang   Path of clang
 " @header  Path of header to generate
 " @return  Output of clang
-" 
+"
 " Use of global var:
 "    b:clang_options_noPCH
 "
@@ -507,7 +511,7 @@ func! s:GenPCH(clang, header)
           \ "&Yes\n&No", 2)
     if cho != 1 | return | endif
   endif
- 
+
   let l:header      = shellescape(expand(a:header))
   let l:header_pch  = l:header . ".pch"
   let l:command = printf('%s -cc1 %s -emit-pch -o %s %s', a:clang, b:clang_options_noPCH, l:header_pch, l:header)
@@ -580,12 +584,12 @@ endf
 func! s:ParseCompletePoint()
     let l:line = getline('.')
     let l:start = col('.') - 1 " start column
-    
+
     "trim right spaces
     while l:start > 0 && l:line[l:start - 1] =~ '\s'
       let l:start -= 1
     endwhile
-    
+
     let l:col = l:start
     while l:col > 0 && l:line[l:col - 1] =~# '[_0-9a-zA-Z]'  " find valid ident
       let l:col -= 1
@@ -606,12 +610,12 @@ func! s:ParseCompletePoint()
         return [-3, l:base]
       endif
     endif
-    
+
     " trim right spaces
     while l:col > 0 && l:line[l:col -1] =~ '\s'
       let l:col -= 1
     endwhile
-   
+
     let l:ismber = 0
     if (l:col >= 1 && l:line[l:col - 1] == '.')
         \ || (l:col >= 2 && l:line[l:col - 1] == '>' && l:line[l:col - 2] == '-')
@@ -619,7 +623,7 @@ func! s:ParseCompletePoint()
       let l:start  = l:col
       let l:ismber = 1
     endif
-    
+
     "Noting to complete, pattern completion is not supported...
     if ! l:ismber && empty(l:base)
       return [-3, l:base]
@@ -647,11 +651,11 @@ func! s:ParseCompletionResult(output, base)
       let l:word  = l:line[12 : l:s-2]
       let l:proto = l:line[l:s+2 : -1]
     endif
-    
+
     if l:word !~# '^' . a:base || l:word =~# '(Hidden)$'
       continue
     endif
-    
+
     let l:proto = substitute(l:proto, '\(<#\)\|\(#>\)\|#', '', 'g')
     if empty(l:res) || l:res[-1]['word'] !=# l:word
       call add(l:res, {
@@ -758,7 +762,7 @@ endfunction
 "   3. append user options first
 "   3.5 append clang default include directories to option
 "   4. setup buffer maps to auto completion
-"  
+"
 "  Usable vars after return:
 "     b:clang_isCompleteDone_0  => used when CompleteDone event not available
 "     b:clang_options => parepared clang cmd options
@@ -833,7 +837,7 @@ func! s:ClangCompleteInit(force)
       let b:clang_options .= g:clang_cpp_options
     endif
   endif
-  
+
   " add current dir to include path
   let b:clang_options .= ' -I ' . shellescape(expand("%:p:h"))
 
@@ -844,7 +848,7 @@ func! s:ClangCompleteInit(force)
       let b:clang_options .= ' -I ' . shellescape(l:dir)
     endfor
   endif
-  
+
   " parse include path from &path
   if g:clang_use_path
     let l:dirs = map(split(&path, '\\\@<![, ]'), 'substitute(v:val, ''\\\([, ]\)'', ''\1'', ''g'')')
@@ -876,7 +880,7 @@ func! s:ClangCompleteInit(force)
 
   " Create GenPCH command
   com! -nargs=* ClangGenPCHFromFile call <SID>GenPCH(g:clang_exec, <f-args>)
-  
+
   " Create close diag and preview window command
   com! ClangCloseWindow  call <SID>DiagnosticsPreviewWindowClose()
 
@@ -918,12 +922,14 @@ func! s:ClangCompleteInit(force)
   au BufLeave <buffer> call <SID>BufVarRestore()
 
   " auto check syntax when write buffer
-  au BufWritePost <buffer> ClangSyntaxCheck
+	if g:clang_check_syntax_auto
+		au BufWritePost <buffer> ClangSyntaxCheck
+	endif
 
   " auto format current file if is enabled
   if g:clang_format_auto
     au BufWritePost <buffer> ClangFormat
-  end
+  endif
 
   call s:GlobalVarRestore(l:gvars)
 endf
@@ -995,7 +1001,7 @@ func! s:ClangExecute(root, clang_options, line, col)
         " Ignore
       endtry
     endif
-    
+
     let l:optc = g:clang_sh_is_cmd ? '/c' : '-c'
     let l:argv = [g:clang_sh_exec, l:optc, l:cmd]
     " FuncRef must start with cap var
@@ -1147,18 +1153,18 @@ func! s:ClangComplete(findstart, base)
       " re-enter async mode, clang is busy
       return -3
     endif
-    
+
     let [l:start, l:base] = s:ParseCompletePoint()
     if l:start < 0
       " this is the cancel mode
       return l:start
     endif
-    
+
     let l:line    = line('.')
     let l:col     = l:start + 1
     let l:getline = getline('.')[0 : l:col-2]
     call s:PDebug("ClangComplete", printf("line: %s, col: %s, getline: %s", l:line, l:col, l:getline))
-    
+
     " Cache parsed result into b:clang_cache
     " Reparse source file when:
     "   * first time
@@ -1192,7 +1198,7 @@ func! s:ClangComplete(findstart, base)
       " start async mode, need to wait the call back
       return -3
     endif
-    
+
     " update completions by new l:base
     let b:clang_cache['completions'] = s:ParseCompletionResult(b:clang_state['stdout'], l:base)
     " close preview window if empty or has no preview window above, may above
@@ -1217,4 +1223,4 @@ func! s:ClangComplete(findstart, base)
 endf
 "}}}
 
-" vim: set shiftwidth=2 softtabstop=2 tabstop=2:
+" vim: set shiftwidth=2 softtabstop=2 tabstop=2 foldmethod=marker:

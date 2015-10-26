@@ -10,7 +10,7 @@ Changelog                                       |clang-changelog|
 Credits                                         |clang-credits|
 ==============================================================================
 INTRODUCTION                                    *clang-introduction*
-This is a plugin to complete C/C++ source code using Clang. 
+This is a plugin to complete C/C++ source code using Clang.
 
 - Requirements
     - Executable
@@ -45,7 +45,7 @@ need automatically generated options for clang by the plugin.
 See |g:clang_dotfile_overwrite| for more details.
 
 Please note that all options in ".clang" and ".clang.ow" must be safe
-to be used by the 'shell', that means special chars should always be 
+to be used by the 'shell', that means special chars should always be
 escaped correctly. See |shellescape()| for more details.
 
 ==============================================================================
@@ -87,7 +87,7 @@ g:clang_cpp_completeopt                 *g:clang_cpp_completeopt*
         let g:clang_cpp_completeopt = 'longest,menuone,preview'
 <
 g:clang_diagsopt                        *g:clang_diagsopt*
-        This option is a string combined with split mode, colon, 
+        This option is a string combined with split mode, colon,
         and max height of the split window. Colon and max height are
         optional.
         e.g. >
@@ -99,25 +99,25 @@ g:clang_diagsopt                        *g:clang_diagsopt*
         otherwise diagnostics will be put in a split window/viewport.
         Split policy indicators and their corresponding modes are: >
             " disable diagnostics window
-            let g:clang_diagsopt = '' 
+            let g:clang_diagsopt = ''
 
             " split SCREEN horizontally, with new split on the top
             let g:clang_diagsopt = 'topleft'
 
             " split SCREEN horizontally, with new split on the bottom
             let g:clang_diagsopt = 'botright'
-            
+
             " split VIEWPORT horizontally, with new split on the bottom
             let g:clang_diagsopt = 'rightbelow'
 
             " split VIEWPORT horizontally, with new split on the top
-            let g:clang_diagsopt = 'leftabove' 
+            let g:clang_diagsopt = 'leftabove'
 <
     Default: >
         let g:clang_diagsopt = 'rightbelow:6'
 <
 g:clang_dotfile                         *g:clang_dotfile*
-        Each project can have a dot file at his root, containing 
+        Each project can have a dot file at his root, containing
         the compiler options. This is useful if you're using some
         non-standard include paths.
         Note: Relative include and library path is recommended.
@@ -165,7 +165,13 @@ g:clang_format_style                    *g:clang_format_style*
         Style can be LLVM, Google, Chromium, Mozilla, WebKit
     Default: >
         let g:clang_format_style = 'LLVM'
-<
+
+g:clang_check_syntax_auto               *g:clang_check_syntax_auto*
+        If equals to 1, automatically check the syntax of the current file
+        when saving the file.
+    Default: >
+        let g:clang_check_syntax_auto = 0
+
 g:clang_include_sysheaders              *g:clang_include_sysheaders*
         Discover default system C/C++ headers automatically.
         Set 0 to disable it.
@@ -197,7 +203,7 @@ g:clang_sh_exec                         *g:clang_sh_exec*
         " on windows
         let g:clang_sh_exec = 'C:\Windows\system32\cmd.exe'
         " otherwise
-        let g:clang_sh_exec = 'bash' 
+        let g:clang_sh_exec = 'bash'
 <
 g:clang_statusline                      *g:clang_statusline*
         Status line showed in preview window and diagnostics window.
@@ -208,7 +214,7 @@ g:clang_statusline                      *g:clang_statusline*
 <
 g:clang_stdafx_h                        *g:clang_stdafx_h*
         Clang default header file name to generate PCH. Clang will find
-        the stdafx header to speed up completion. 
+        the stdafx header to speed up completion.
         Note: Only find this file in clang root and its sub directory
         "include". If it is not in mentioned dirs, it must be defined
         in the dotclang file "-include-pch /path/to/stdafx.h.pch".
@@ -261,7 +267,8 @@ ClangGenPCHFromFile <stdafx.h>          *ClangGenPCHFromFile*
 
 ClangSyntaxCheck                        *ClangSyntaxCheck*
         Run syntax check mannually. Syntax checker will be called when save
-        file, and diagnostics window will be opened if has error.
+        file if |g:clang_check_syntax_auto| is set to 1, and diagnostics
+        window will be opened if has error.
 
 ==============================================================================
 FAQ                                              *clang-faq*
@@ -278,13 +285,13 @@ A: Please use with neocomplete, they can work well together.
         " default 'longest' can not work with neocomplete
         let g:clang_c_completeopt = 'menuone,preview'
         let g:clang_cpp_completeopt = 'menuone,preview'
-        
+
         " use neocomplete
         " input patterns
         if !exists('g:neocomplete#force_omni_input_patterns')
           let g:neocomplete#force_omni_input_patterns = {}
         endif
-        
+
         " for c and c++
         let g:neocomplete#force_omni_input_patterns.c =
               \ '[^.[:digit:] *\t]\%(\.\|->\)\w*'
