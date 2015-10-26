@@ -672,6 +672,60 @@ func! s:ParseCompletionResult(output, base)
   return l:res
 endf
 " }}}
+"{{{ s:SetNeomakeMakerArguments
+" Set neomake_{c,cpp}_{clang,gcc}_maker variables to add the Clang arguments
+" parsed from the .clang or .clang.ow files.
+" @clang_options the options to be passed to makers
+func! s:SetNeomakeMakerArguments(clang_options)
+  " Split the arguments into a list
+  let l:clang_options = split(a:clang_options, " ")
+
+  if &filetype == 'cpp'
+
+    if !exists('g:neomake_cpp_clang_maker')
+      let g:neomake_cpp_clang_maker = {
+            \ "args": l:clang_options
+          \}
+    elseif has_key(g:neomake_cpp_clang_maker, "args")
+      call extend(g:neomake_cpp_clang_maker["args"], l:clang_options)
+    else
+      let g:neomake_cpp_clang_maker["args"] = l:clang_options
+    endif
+
+    if !exists('g:neomake_cpp_gcc_maker')
+      let g:neomake_cpp_gcc_maker = {
+            \ "args": l:clang_options
+          \}
+    elseif has_key(g:neomake_cpp_gcc_maker, "args")
+      call extend(g:neomake_cpp_gcc_maker["args"], l:clang_options)
+    else
+      let g:neomake_cpp_gcc_maker["args"] = l:clang_options
+    endif
+
+  elseif &filetype == 'c'
+    if !exists('g:neomake_c_clang_maker')
+      let g:neomake_c_clang_maker = {
+            \ "args": l:clang_options
+          \}
+    elseif has_key(g:neomake_c_clang_maker, "args")
+      call extend(g:neomake_c_clang_maker["args"], l:clang_options)
+    else
+      let g:neomake_c_clang_maker["args"] = l:clang_options
+    endif
+
+    if !exists('g:neomake_c_gcc_maker')
+      let g:neomake_c_gcc_maker = {
+            \ "args": l:clang_options
+          \}
+    elseif has_key(g:neomake_c_gcc_maker, "args")
+      call extend(g:neomake_c_gcc_maker["args"], l:clang_options)
+    else
+      let g:neomake_c_gcc_maker["args"] = l:clang_options
+    endif
+
+  endif
+endf
+"}}}
 "{{{ s:ShrinkPrevieWindow
 " Shrink preview window to fit lines.
 " Assume cursor is in the editing window, and preview window is above of it.
@@ -930,6 +984,9 @@ func! s:ClangCompleteInit(force)
   if g:clang_format_auto
     au BufWritePost <buffer> ClangFormat
   endif
+
+	" Set the configuration variables for Neomake makers
+  call s:SetNeomakeMakerArguments(b:clang_options)
 
   call s:GlobalVarRestore(l:gvars)
 endf
