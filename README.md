@@ -90,6 +90,21 @@ variable in your vimrc to your cmake build path.
 
         let g:clang_compilation_database = './build'
 
+Neomake integration [new]
+-------------------------
+* vim-clang now adds the compilation arguments parsed from .clang and .clang.ow
+  to Neomake configuration variables. This means that the include search paths
+  (`-I`) that are in the .clang files will be passed down to the clang and gcc
+  makers from Neomake whithout overriding your configuration.
+* vim-clang will also set the directory from where the maker will run, which is
+  the directory where the first .clang or .clang.ow is.
+
+The variables that are affected are:
+* `g:neomake_cpp_clang_maker`
+* `g:neomake_cpp_gcc_maker`
+* `g:neomake_c_clang_maker`
+* `g:neomake_c_gcc_maker`
+
 Options and Commands
 --------------------
 `:h clang.txt`
