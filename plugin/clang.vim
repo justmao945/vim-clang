@@ -679,53 +679,82 @@ endf
 " @clang_root the directory whence the maker must be executed
 func! s:SetNeomakeMakerArguments(clang_options, clang_root)
   " Split the arguments into a list
+  " TODO: more intelligent splitting (an argument like '-I "/dir with/spaces"'
+  "       would not work)
   let l:clang_options = split(a:clang_options, " ")
 
   if &filetype == 'cpp'
 
-    if !exists('g:neomake_cpp_clang_maker')
-      let g:neomake_cpp_clang_maker = {
-            \ "args": l:clang_options
-          \}
-    elseif has_key(g:neomake_cpp_clang_maker, "args")
-      call extend(g:neomake_cpp_clang_maker["args"], l:clang_options)
-    else
-      let g:neomake_cpp_clang_maker["args"] = l:clang_options
+    " Store the original clang maker config to avoid a never-ending list of
+    " args
+    if !exists('s:origin_neomake_cpp_clang_maker')
+      if !exists('g:neomake_cpp_clang_maker')
+        " Neomake default
+        let s:origin_neomake_cpp_clang_maker = neomake#makers#ft#cpp#clang()
+      else
+        " User config
+        let s:origin_neomake_cpp_clang_maker = g:neomake_cpp_clang_maker
+      endif
     endif
+
+    " deepcopy needed as changing one would change the other otherwise.
+    let g:neomake_cpp_clang_maker = deepcopy(s:origin_neomake_cpp_clang_maker)
+    call extend(g:neomake_cpp_clang_maker["args"], l:clang_options)
     let g:neomake_cpp_clang_maker["cwd"] = a:clang_root
 
-    if !exists('g:neomake_cpp_gcc_maker')
-      let g:neomake_cpp_gcc_maker = {
-            \ "args": l:clang_options
-          \}
-    elseif has_key(g:neomake_cpp_gcc_maker, "args")
-      call extend(g:neomake_cpp_gcc_maker["args"], l:clang_options)
-    else
-      let g:neomake_cpp_gcc_maker["args"] = l:clang_options
+    " Store the original gcc maker config to avoid a never-ending list of
+    " args
+    if !exists('s:origin_neomake_cpp_gcc_maker')
+      if !exists('g:neomake_cpp_gcc_maker')
+        " Neomake default
+        let s:origin_neomake_cpp_gcc_maker = neomake#makers#ft#cpp#gcc()
+      else
+        " User config
+        let s:origin_neomake_cpp_gcc_maker = g:neomake_cpp_gcc_maker
+      endif
     endif
+
+    " deepcopy needed as changing one would change the other otherwise.
+    let g:neomake_cpp_gcc_maker = deepcopy(s:origin_neomake_cpp_gcc_maker)
+    call extend(g:neomake_cpp_gcc_maker["args"], l:clang_options)
+    let g:neomake_cpp_gcc_maker["args"] = l:clang_options
     let g:neomake_cpp_gcc_maker["cwd"] = a:clang_root
 
   elseif &filetype == 'c'
-    if !exists('g:neomake_c_clang_maker')
-      let g:neomake_c_clang_maker = {
-            \ "args": l:clang_options
-          \}
-    elseif has_key(g:neomake_c_clang_maker, "args")
-      call extend(g:neomake_c_clang_maker["args"], l:clang_options)
-    else
-      let g:neomake_c_clang_maker["args"] = l:clang_options
+
+    " Store the original clang maker config to avoid a never-ending list of
+    " args
+    if !exists('s:origin_neomake_c_clang_maker')
+      if !exists('g:neomake_c_clang_maker')
+        " Neomake default
+        let s:origin_neomake_c_clang_maker = neomake#makers#ft#c#clang()
+      else
+        " User config
+        let s:origin_neomake_c_clang_maker = g:neomake_c_clang_maker
+      endif
     endif
+
+    " deepcopy needed as changing one would change the other otherwise.
+    let g:neomake_c_clang_maker = deepcopy(s:origin_neomake_c_clang_maker)
+    call extend(g:neomake_c_clang_maker["args"], l:clang_options)
     let g:neomake_c_clang_maker["cwd"] = a:clang_root
 
-    if !exists('g:neomake_c_gcc_maker')
-      let g:neomake_c_gcc_maker = {
-            \ "args": l:clang_options
-          \}
-    elseif has_key(g:neomake_c_gcc_maker, "args")
-      call extend(g:neomake_c_gcc_maker["args"], l:clang_options)
-    else
-      let g:neomake_c_gcc_maker["args"] = l:clang_options
+    " Store the original gcc maker config to avoid a never-ending list of
+    " args
+    if !exists('s:origin_neomake_c_gcc_maker')
+      if !exists('g:neomake_c_gcc_maker')
+        " Neomake default
+        let s:origin_neomake_c_gcc_maker = neomake#makers#ft#c#gcc()
+      else
+        " User config
+        let s:origin_neomake_c_gcc_maker = g:neomake_c_gcc_maker
+      endif
     endif
+
+    " deepcopy needed as changing one would change the other otherwise.
+    let g:neomake_c_gcc_maker = deepcopy(s:origin_neomake_c_gcc_maker)
+    call extend(g:neomake_c_gcc_maker["args"], l:clang_options)
+    let g:neomake_c_gcc_maker["args"] = l:clang_options
     let g:neomake_c_gcc_maker["cwd"] = a:clang_root
 
   endif
