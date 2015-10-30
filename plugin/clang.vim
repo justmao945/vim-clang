@@ -689,11 +689,18 @@ func! s:SetNeomakeMakerArguments(clang_options, clang_root)
     " args
     if !exists('s:origin_neomake_cpp_clang_maker')
       if !exists('g:neomake_cpp_clang_maker')
-        " Neomake default
-        let s:origin_neomake_cpp_clang_maker = neomake#makers#ft#cpp#clang()
+        try
+          " Neomake default
+          let s:origin_neomake_cpp_clang_maker = neomake#makers#ft#cpp#clang()
+        catch /^Vim\%((\a\+)\)\=:E117/
+          let s:origin_neomake_cpp_clang_maker = { "args" : [] }
+        endtry
       else
         " User config
         let s:origin_neomake_cpp_clang_maker = g:neomake_cpp_clang_maker
+        if !exists('s:origin_neomake_cpp_clang_maker["args"]')
+          let s:origin_neomake_cpp_clang_maker["args"] = []
+        endif
       endif
     endif
 
@@ -706,11 +713,18 @@ func! s:SetNeomakeMakerArguments(clang_options, clang_root)
     " args
     if !exists('s:origin_neomake_cpp_gcc_maker')
       if !exists('g:neomake_cpp_gcc_maker')
-        " Neomake default
-        let s:origin_neomake_cpp_gcc_maker = neomake#makers#ft#cpp#gcc()
+        try
+          " Neomake default
+          let s:origin_neomake_cpp_gcc_maker = neomake#makers#ft#cpp#gcc()
+        catch /^Vim\%((\a\+)\)\=:E117/
+          let s:origin_neomake_cpp_gcc_maker = { "args" : [] }
+        endtry
       else
         " User config
         let s:origin_neomake_cpp_gcc_maker = g:neomake_cpp_gcc_maker
+        if !exists('s:origin_neomake_cpp_gcc_maker["args"]')
+          let s:origin_neomake_cpp_gcc_maker["args"] = []
+        endif
       endif
     endif
 
@@ -726,11 +740,18 @@ func! s:SetNeomakeMakerArguments(clang_options, clang_root)
     " args
     if !exists('s:origin_neomake_c_clang_maker')
       if !exists('g:neomake_c_clang_maker')
-        " Neomake default
-        let s:origin_neomake_c_clang_maker = neomake#makers#ft#c#clang()
+        try
+          " Neomake default
+          let s:origin_neomake_c_clang_maker = neomake#makers#ft#c#clang()
+        catch /^Vim\%((\a\+)\)\=:E117/
+          let s:origin_neomake_c_clang_maker = { "args" : [] }
+        endtry
       else
         " User config
         let s:origin_neomake_c_clang_maker = g:neomake_c_clang_maker
+        if !exists('s:origin_neomake_c_clang_maker["args"]')
+          let s:origin_neomake_c_clang_maker["args"] = []
+        endif
       endif
     endif
 
@@ -743,11 +764,18 @@ func! s:SetNeomakeMakerArguments(clang_options, clang_root)
     " args
     if !exists('s:origin_neomake_c_gcc_maker')
       if !exists('g:neomake_c_gcc_maker')
-        " Neomake default
-        let s:origin_neomake_c_gcc_maker = neomake#makers#ft#c#gcc()
+        try
+          " Neomake default
+          let s:origin_neomake_c_gcc_maker = neomake#makers#ft#c#gcc()
+        catch /^Vim\%((\a\+)\)\=:E117/
+          let s:origin_neomake_c_gcc_maker = { "args" : [] }
+        endtry
       else
         " User config
         let s:origin_neomake_c_gcc_maker = g:neomake_c_gcc_maker
+        if !exists('s:origin_neomake_c_gcc_maker["args"]')
+          let s:origin_neomake_c_gcc_maker["args"] = []
+        endif
       endif
     endif
 
@@ -1019,8 +1047,10 @@ func! s:ClangCompleteInit(force)
     au BufWritePost <buffer> ClangFormat
   endif
 
-	" Set the configuration variables for Neomake makers
-  call s:SetNeomakeMakerArguments(b:clang_options, b:clang_root)
+  if exists(":Neomake")
+    " Set the configuration variables for Neomake makers
+    call s:SetNeomakeMakerArguments(b:clang_options, b:clang_root)
+  endif
 
   call s:GlobalVarRestore(l:gvars)
 endf
