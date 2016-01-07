@@ -116,6 +116,10 @@ if !exists('g:clang_vim_exec')
   endif
 endif
 
+if !exists('g:clang_verbose_pmenu')
+  let g:clang_verbose_pmenu = 0
+endif
+
 " Init on c/c++ files
 au FileType c,cpp call <SID>ClangCompleteInit(0)
 "}}}
@@ -656,16 +660,62 @@ func! s:ParseCompletionResult(output, base)
       continue
     endif
 
-    let l:proto = substitute(l:proto, '\(<#\)\|\(#>\)\|#', '', 'g')
-    if empty(l:res) || l:res[-1]['word'] !=# l:word
-      call add(l:res, {
-          \ 'word': l:word,
-          \ 'menu': l:has_preview ? '' : l:word ==# l:proto ? '' : l:proto,
-          \ 'info': l:proto,
-          \ 'dup' : 1 })
-    elseif !empty(l:res)
-      " overload functions, for C++
-      let l:res[-1]['info'] .= "\n" . l:proto
+    if g:clang_verbose_pmenu
+      " Keep `#` for further use
+      "let l:proto = substitute(l:proto, '\(<#\)\|\(#>\)\|#', '', 'g')
+      " Identify the type (test)
+      if empty(l:res) || l:res[-1]['word'] !=# l:word
+        if l:proto =~ '\v^\[#.{-}#\].+\(.*\).*' 
+          let l:kind = 'f'
+        elseif l:proto =~ '\v^\[#.*#\].+'
+          let l:kind = 'v'
+        elseif l:proto =~ '\v.+'
+          let l:kind = 't'
+        else
+          let l:kind = '?'
+        endif
+        if l:kind == 'f' || l:kind == 'v'
+          " Get the type of return value in the first []
+          let l:typeraw = matchlist(l:proto, '\v^\[#.{-}#\]')
+          let l:rettype = len(l:typeraw) ? typeraw[0][1:-2] : ""
+          let l:core = l:proto[strlen(l:rettype) + 2 :]
+        else
+          let l:rettype = ""
+          let l:core = l:proto
+        endif
+        " Remove # here
+        let l:core = substitute(l:core, '\v\<#|#\>|#', '', 'g')
+        let l:proto = substitute(l:proto, '\v\<#|#\>|#', '', 'g')
+        let l:rettype = substitute(l:rettype, '\v\<#|#\>|#', '', 'g')
+        " Another improvement: keep space for type, but only display abbr when
+        " space is limited
+        if strlen(l:core) > (&columns - wincol() - 25) && (&columns - wincol() > 20)
+          let l:core = l:core[0:&columns - wincol() - 25] . "..."
+        endif
+        call add(l:res, {
+              \ 'word': l:word,
+              \ 'abbr' : l:core,
+              \ 'kind' : l:kind,
+              \ 'menu': l:rettype,
+              \ 'info': l:proto,
+              \ 'dup' : 1 })
+      elseif !empty(l:res)
+        " overload functions, for C++
+        let l:proto = substitute(l:proto, '\v\<#|#\>|#', '', 'g')
+        let l:res[-1]['info'] .= "\n" . l:proto
+      endif
+    else
+      let l:proto = substitute(l:proto, '\(<#\)\|\(#>\)\|#', '', 'g')
+      if empty(l:res) || l:res[-1]['word'] !=# l:word
+        call add(l:res, {
+              \ 'word': l:word,
+              \ 'menu': l:has_preview ? '' : l:word ==# l:proto ? '' : l:proto,
+              \ 'info': l:proto,
+              \ 'dup' : 1 })
+      elseif !empty(l:res)
+        " overload functions, for C++
+        let l:res[-1]['info'] .= "\n" . l:proto
+      endif
     endif
   endfor
 

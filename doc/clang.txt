@@ -227,6 +227,13 @@ g:clang_use_path                        *g:clang_use_path*
     Default: >
         let g:clang_use_path = 1
 <
+g:clang_verbose_pmenu                        *g:clang_verbose_pmenu*
+          Control the verbose level of popup menu, which is similar to Youcompleteme.
+          For example, the popup menu would show 'push_back(const_reference __x) f [O] void'
+          instead of 'push_back' if is set to 1.
+     Default: >
+          let g:clang_verbose_pmenu = 0
+<
 g:clang_vim_exec                        *g:clang_vim_exec*
         Name or path of executable vim.
         Note: This option is used in async mode to startup a new vim
