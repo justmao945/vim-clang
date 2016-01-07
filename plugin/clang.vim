@@ -116,8 +116,8 @@ if !exists('g:clang_vim_exec')
   endif
 endif
 
-if !exists('g:clang_verbose_menu')
-  let g:clang_verbose_menu = 0
+if !exists('g:clang_verbose_pmenu')
+  let g:clang_verbose_pmenu = 0
 endif
 
 " Init on c/c++ files
@@ -660,7 +660,7 @@ func! s:ParseCompletionResult(output, base)
       continue
     endif
 
-    if g:clang_verbose_menu
+    if g:clang_verbose_pmenu
       " Keep `#` for further use
       "let l:proto = substitute(l:proto, '\(<#\)\|\(#>\)\|#', '', 'g')
       " Identify the type (test)
