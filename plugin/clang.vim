@@ -128,7 +128,7 @@ au FileType c,cpp call <SID>ClangCompleteInit(0)
 func! s:IsValidFile()
   let l:cur = expand("%")
   " don't load plugin when in fugitive buffer
-  if l:cur =~ 'fugitive:///'
+  if l:cur =~ 'fugitive://'
     return 0
   endif
   " Please don't use filereadable to test, as the new created file is also
