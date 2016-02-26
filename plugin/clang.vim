@@ -146,7 +146,7 @@ endf
 "
 " @head Prefix of debug info
 " @info Can be a string list, string, or dict
-" @lv   Debug level, write info only when lv < g:clang_debug, deault is 1
+" @lv   Debug level, write info only when lv < g:clang_debug, default is 1
 func! s:PDebug(head, info, ...)
   let l:lv = a:0 > 0 && a:1 > 1 ? a:1 : 1
 
