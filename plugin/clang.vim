@@ -1036,12 +1036,12 @@ func! s:ClangCompleteInit(force)
   " Or add `-include-pch /path/to/x.h.pch` into the root file .clang manully
   if &filetype == 'cpp' && b:clang_options !~# '-include-pch'
     let l:cwd = fnameescape(getcwd())
-    exe 'lcd ' . b:clang_root
+    silent exe 'lcd ' . b:clang_root
     let l:afx = findfile(g:clang_stdafx_h, '.;./include') . '.pch'
     if filereadable(l:afx)
       let b:clang_options .= ' -include-pch ' . shellescape(l:afx)
     endif
-    exe 'lcd '.l:cwd
+    silent exe 'lcd '.l:cwd
   endif
 
   " Create GenPCH command
@@ -1153,7 +1153,7 @@ endf
 " @return [completion, diagnostics]
 func! s:ClangExecute(root, clang_options, line, col)
   let l:cwd = fnameescape(getcwd())
-  exe 'lcd ' . a:root
+  silent exe 'lcd ' . a:root
   let l:src = join(getline(1, '$'), "\n") . "\n"
   " shorter version, without redirecting stdout and stderr
   let l:cmd = printf('%s -fsyntax-only -Xclang -code-completion-macros -Xclang -code-completion-at=-:%d:%d %s -',
@@ -1222,7 +1222,7 @@ func! s:ClangExecute(root, clang_options, line, col)
       call s:PError('s:ClangExecute::acmd', 'execute async command failed')
     endif
   endif
-  exe 'lcd ' . l:cwd
+  silent exe 'lcd ' . l:cwd
   let b:clang_state['stdout'] = l:res[0]
   let b:clang_state['stderr'] = l:res[1]
   return l:res
@@ -1268,13 +1268,13 @@ endf
 " problem. Now this function will block...
 func! s:ClangSyntaxCheck(root, clang_options)
   let l:cwd = fnameescape(getcwd())
-  exe 'lcd ' . a:root
+  silent exe 'lcd ' . a:root
   let l:src = join(getline(1, '$'), "\n")
   let l:command = printf('%s -fsyntax-only %s -', g:clang_exec, a:clang_options)
   call s:PDebug("ClangSyntaxCheck::command", l:command)
   let l:clang_output = system(l:command, l:src)
   call s:DiagnosticsWindowOpen(expand('%:p:.'), split(l:clang_output, '\n'))
-  exe 'lcd ' . l:cwd
+  silent exe 'lcd ' . l:cwd
 endf
 " }}}
 " {{{ s:ClangFormat
