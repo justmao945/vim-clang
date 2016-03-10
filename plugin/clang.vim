@@ -944,10 +944,10 @@ func! s:ClangCompleteInit(force)
   " find project file first
   let l:cwd = fnameescape(getcwd())
   let l:fwd = fnameescape(expand('%:p:h'))
-  exe 'lcd ' . l:fwd
+  silent exe 'lcd ' . l:fwd
   let l:dotclang    = findfile(g:clang_dotfile, '.;')
   let l:dotclangow  = findfile(g:clang_dotfile_overwrite, '.;')
-  exe 'lcd '.l:cwd
+  silent exe 'lcd '.l:cwd
 
   let l:has_dotclang = strlen(l:dotclang) + strlen(l:dotclangow)
   if !l:has_dotclang && g:clang_load_if_clang_dotfile
