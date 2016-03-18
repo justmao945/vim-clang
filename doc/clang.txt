@@ -252,6 +252,11 @@ g:clang_compilation_database            *g:clang_compilation_database*
     Default: >
         let g:clang_compilation_database = ''
 <
+g:clang_enable_format_command           *g:clang_enable_format_command*
+        If equals to 1, enable ClangFormat command.
+    Default: >
+        let g:clang_enable_format_command = 1
+<
 ==============================================================================
 COMMANDS                                         *clang-commands*
 
