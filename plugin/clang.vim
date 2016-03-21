@@ -66,6 +66,10 @@ if !exists('g:clang_format_style')
   let g:clang_format_style = 'LLVM'
 end
 
+if !exists('g:clang_enable_format_command')
+  let g:clang_enable_format_command = 1
+endif
+
 if !exists('g:clang_check_syntax_auto')
 	let g:clang_check_syntax_auto = 0
 endif
@@ -1056,8 +1060,10 @@ func! s:ClangCompleteInit(force)
   " Useful to check syntax only
   com! ClangSyntaxCheck call <SID>ClangSyntaxCheck(b:clang_root, b:clang_options)
 
-  " Useful to format source code
-  com! ClangFormat call <SID>ClangFormat()
+  if g:clang_enable_format_command
+    " Useful to format source code
+    com! ClangFormat call <SID>ClangFormat()
+  endif
 
   if g:clang_auto   " Auto completion
     inoremap <expr> <buffer> . <SID>CompleteDot()
