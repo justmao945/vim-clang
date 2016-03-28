@@ -1287,7 +1287,7 @@ endf
 " Call clang-format to format source code
 func! s:ClangFormat()
   let l:view = winsaveview()
-  let l:command = printf("%s -style=%s ", g:clang_format_exec, g:clang_format_style)
+  let l:command = printf("%s -style=\"%s\" ", g:clang_format_exec, g:clang_format_style)
   silent execute '%!'. l:command
   call winrestview(l:view)
 endf
