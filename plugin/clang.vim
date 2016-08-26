@@ -1238,6 +1238,7 @@ func! ClangExecuteDone(tmp1, tmp2)
   let b:clang_state['stdout'] = l:res[0]
   let b:clang_state['stderr'] = l:res[1]
   call s:ClangExecuteDoneTriggerCompletion()
+  return ''
 endf
 "}}}
 "{{{ s:ClangExecuteDoneTriggerCompletion
