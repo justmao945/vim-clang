@@ -86,6 +86,12 @@ g:clang_cpp_completeopt                 *g:clang_cpp_completeopt*
         " Have preview window for C++ as its complex prototypes
         let g:clang_cpp_completeopt = 'longest,menuone,preview'
 <
+g:clang_debug                           *g:clang_debug*
+        Turns on debug mode with value being verbosity.
+        Accepts values from 0-4, anything above 3 will output all debug information
+        Default: >
+            let g:clang_debug = 0.
+<
 g:clang_diagsopt                        *g:clang_diagsopt*
         This option is a string combined with split mode, colon,
         and max height of the split window. Colon and max height are
