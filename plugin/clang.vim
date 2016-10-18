@@ -383,7 +383,7 @@ func! s:DiagnosticsWindowOpen(src, diags)
   else
     " goto the exist window
     call s:PDebug("s:DiagnosticsWindowOpen::wincmd", l:winnr)
-    exe l:winnr . 'wincmd w'
+    exe l:winnr . s:WincmdW()
   endif
 
   " the last line will be showed in status line as file name
@@ -439,7 +439,7 @@ func! s:DiagnosticsWindowOpen(src, diags)
 
   " back to current window, aka the driver window
   let t:clang_diags_driver_bufnr = l:cbuf
-  exe bufwinnr(l:cbuf) . 'wincmd w'
+  exe bufwinnr(l:cbuf) . s:WincmdW()
   return t:clang_diags_bufnr
 endf
 "}}}
@@ -463,9 +463,9 @@ func! s:DiagnosticsWindowClose()
     return
   endif
 
-  exe l:dwn . 'wincmd w'
+  exe l:dwn . s:WincmdW()
   quit
-  exe l:cwn . 'wincmd w'
+  exe l:cwn . s:WincmdW()
 
   call s:PDebug("s:DiagnosticsWindowClose", l:dwn)
 endf
@@ -569,11 +569,11 @@ func! s:HasPreviewAbove()
   let l:cwin = winnr()
   let l:has = 0
   " goto above
-  wincmd k
+  call s:WincmdK()
   if &completeopt =~ 'preview' && &previewwindow
     let l:has = 1
   endif
-  exe l:cwin . 'wincmd w'
+  exe l:cwin . s:WincmdW()
   return l:has
 endf
 "}}}
@@ -669,7 +669,7 @@ func! s:ParseCompletionResult(output, base)
       "let l:proto = substitute(l:proto, '\(<#\)\|\(#>\)\|#', '', 'g')
       " Identify the type (test)
       if empty(l:res) || l:res[-1]['word'] !=# l:word
-        if l:proto =~ '\v^\[#.{-}#\].+\(.*\).*' 
+        if l:proto =~ '\v^\[#.{-}#\].+\(.*\).*'
           let l:kind = 'f'
         elseif l:proto =~ '\v^\[#.*#\].+'
           let l:kind = 'v'
@@ -857,7 +857,7 @@ func! s:ShrinkPrevieWindow()
   let l:cwin = winnr()
   let l:cft  = &filetype
   " go to above view
-  wincmd k
+  call s:WincmdK()
   if &previewwindow
     " enhence the preview window
     if empty(getline('$'))
@@ -879,7 +879,7 @@ func! s:ShrinkPrevieWindow()
   endif
 
   " back to current window
-  exe l:cwin . 'wincmd w'
+  exe l:cwin . s:WincmdW()
 endf
 "}}}
 "{{{ s:ClangCompleteDatabase
@@ -1396,6 +1396,27 @@ func! s:ClangComplete(findstart, base)
     else
       return []
     endif
+  endif
+endf
+"}}}
+"{{{ s:WincmdW
+" Move window in consideration of an splitbelow
+" @return move cursor command
+func! s:WincmdW()
+  if &splitbelow == 0
+    return 'wincmd w'
+  else
+    return 'wincmd W'
+  endif
+endf
+"}}}
+"{{{ s:WincmdK
+" Move window in consideration of an splitbelow
+func! s:WincmdK()
+  if &splitbelow == 0
+    wincmd k
+  else
+    wincmd j
   endif
 endf
 "}}}
