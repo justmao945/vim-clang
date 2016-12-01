@@ -222,7 +222,7 @@ func! s:ShouldComplete()
 endf
 
 func! s:CompleteDot()
-  if s:ShouldComplete()
+  if s:ShouldComplete() && g:clang_auto
     call s:PDebug("s:CompleteDot", 'do')
     return ".\<C-x>\<C-o>"
   endif
@@ -230,7 +230,7 @@ func! s:CompleteDot()
 endf
 
 func! s:CompleteArrow()
-  if s:ShouldComplete() && getline('.')[col('.') - 2] == '-'
+  if s:ShouldComplete() && getline('.')[col('.') - 2] == '-' && g:clang_auto
     call s:PDebug("s:CompleteArrow", "do")
     return ">\<C-x>\<C-o>"
   endif
@@ -238,7 +238,7 @@ func! s:CompleteArrow()
 endf
 
 func! s:CompleteColon()
-  if s:ShouldComplete() && getline('.')[col('.') - 2] == ':'
+  if s:ShouldComplete() && getline('.')[col('.') - 2] == ':' && g:clang_auto
     call s:PDebug("s:CompleteColon", "do")
     return ":\<C-x>\<C-o>"
   endif
@@ -1065,13 +1065,11 @@ func! s:ClangCompleteInit(force)
     com! ClangFormat call <SID>ClangFormat()
   endif
 
-  if g:clang_auto   " Auto completion
     inoremap <expr> <buffer> . <SID>CompleteDot()
     inoremap <expr> <buffer> > <SID>CompleteArrow()
     if &filetype == 'cpp'
       inoremap <expr> <buffer> : <SID>CompleteColon()
     endif
-  endif
 
   " CompleteDone event is available since version 7.3.598
   if exists("##CompleteDone")
