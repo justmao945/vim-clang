@@ -140,6 +140,12 @@ endif
 
 " Init on c/c++ files
 au FileType c,cpp call <SID>ClangCompleteInit(0)
+
+function! MyExpand(arg)
+  return substitute(expand(a:arg), '\\\\', '\\', 'g')
+  "return expand(a:arg)
+endfunction
+
 "}}}
 "{{{ s:IsValidFile
 " A new file is also a valid file
@@ -534,7 +540,7 @@ func! s:GenPCH(clang, header)
     if cho != 1 | return | endif
   endif
 
-  let l:header      = shellescape(expand(a:header))
+  let l:header      = shellescape(MyExpand(a:header))
   let l:header_pch  = l:header . ".pch"
   let l:command = printf('%s -cc1 %s -emit-pch -o %s %s', a:clang, b:clang_options_noPCH, l:header_pch, l:header)
   call s:PDebug("s:GenPCH::cmd", l:command, 2)
@@ -542,7 +548,7 @@ func! s:GenPCH(clang, header)
 
   if v:shell_error
     " uses internal diag window to show errors
-    call s:DiagnosticsWindowOpen(expand('%:p:.'), split(l:clang_output, '\n'))
+    call s:DiagnosticsWindowOpen(MyExpand('%:p:.'), split(l:clang_output, '\n'))
     call s:PDebug("s:GenPCH", {'exit': v:shell_error, 'cmd': l:command, 'out': l:clang_output }, 3)
   else
     " may want to discover pch
@@ -938,7 +944,7 @@ func! s:ClangCompleteInit(force)
 
   " find project file first
   let l:cwd = fnameescape(getcwd())
-  let l:fwd = fnameescape(expand('%:p:h'))
+  let l:fwd = fnameescape(MyExpand('%:p:h'))
   silent exe 'lcd ' . l:fwd
   let l:dotclang    = findfile(g:clang_dotfile, '.;')
   let l:dotclangow  = findfile(g:clang_dotfile_overwrite, '.;')
@@ -1000,7 +1006,7 @@ func! s:ClangCompleteInit(force)
   endif
 
   " add current dir to include path
-  let b:clang_options .= ' -I ' . shellescape(expand("%:p:h"))
+  let b:clang_options .= ' -I ' . shellescape(MyExpand("%:p:h"))
 
   " add include directories if is enabled and not ow
   let l:default_incs = s:DiscoverDefaultIncludeDirs(b:clang_options)
@@ -1271,7 +1277,7 @@ func! s:ClangSyntaxCheck(root, clang_options)
   let l:command = printf('%s -fsyntax-only %s -', g:clang_exec, a:clang_options)
   call s:PDebug("ClangSyntaxCheck::command", l:command)
   let l:clang_output = system(l:command, l:src)
-  call s:DiagnosticsWindowOpen(expand('%:p:.'), split(l:clang_output, '\n'))
+  call s:DiagnosticsWindowOpen(MyExpand('%:p:.'), split(l:clang_output, '\n'))
   silent exe 'lcd ' . l:cwd
 endf
 " }}}
@@ -1376,7 +1382,7 @@ func! s:ClangComplete(findstart, base)
       pclose
     endif
     " call to show diagnostics
-    call s:DiagnosticsWindowOpen(expand('%:p:.'), b:clang_cache['diagnostics'])
+    call s:DiagnosticsWindowOpen(MyExpand('%:p:.'), b:clang_cache['diagnostics'])
     return l:start
   else
     call s:PDebug("ClangComplete", "phase 2")
