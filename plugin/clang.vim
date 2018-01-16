@@ -115,6 +115,8 @@ endif
 if !exists('g:clang_vim_exec')
   if has('mac')
     let g:clang_vim_exec = 'mvim'
+  elseif !g:clang_has_win && has('gui_running')
+    let g:clang_vim_exec = 'gvim'
   else
     let g:clang_vim_exec = 'vim'
   endif
