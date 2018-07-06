@@ -19,7 +19,7 @@ Installation
 
 Why
 ---------------
-I was a user of clang\_compelete and it's really a good job, but someday I found that
+I was a user of clang\_complete and it's really a good job, but someday I found that
 I must write another plugin to overcome some _drawbacks_ of it...
 
 vim-clang VS [Rip-Rip/clang_complete][1]
@@ -95,7 +95,7 @@ Neomake integration [new]
 * vim-clang now adds the compilation arguments parsed from .clang and .clang.ow
   to Neomake configuration variables. This means that the include search paths
   (`-I`) that are in the .clang files will be passed down to the clang and gcc
-  makers from Neomake whithout overriding your configuration.
+  makers from Neomake without overriding your configuration.
 * vim-clang will also set the directory from where the maker will run, which is
   the directory where the first .clang or .clang.ow is.
 
