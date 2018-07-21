@@ -897,6 +897,32 @@ func! s:ClangCompleteDatabase()
 
     call s:PDebug("s:ClangCompleteInit::database", l:ccd)
     if filereadable(l:ccd)
+      if has('python3')
+python3 << endpython
+import vim
+import re
+import json
+
+current = vim.eval("expand('%:p')")
+ccd = vim.eval("l:ccd")
+opts = []
+
+with open(ccd) as database:
+  data = json.load(database)
+
+  for d in data:
+    # hax for headers
+    fmatch = re.search(r'(.*)\.(\w+)$', current)
+    dmatch = re.search(r'(.*)\.(\w+)$', d['file'])
+
+    if fmatch.group(1) == dmatch.group(1):
+      for result in re.finditer(r'-[ID]\s*[^\s]+', d['command']):
+        opts.append(result.group(0))
+      break
+
+vim.command("let l:clang_options = '" + ' '.join(opts) + "'")
+endpython
+      else
 python << endpython
 import vim
 import re
@@ -926,6 +952,7 @@ with open(ccd) as database:
 
 vim.command("let l:clang_options = '" + ' '.join(opts) + "'")
 endpython
+      endif
     endif
   endif
 
