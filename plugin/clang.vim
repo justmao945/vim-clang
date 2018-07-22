@@ -6,6 +6,18 @@ let g:clang_loaded = 1
 
 let g:clang_has_win = has('win16') || has('win32') || has('win64') || has('win95')
 
+" Choose a python infrastructre
+if has('pythonx')
+  let s:py = 'pyxfile'
+elseif has('python3')
+  let s:py = 'py3file'
+else
+  let s:py = 'pyfile'
+endif
+
+" Path to complete_database.py
+let s:complete_database_py = fnamemodify(resolve(expand('<sfile>:p')), ':h') . '/complete_database.py'
+
 if !exists('g:clang_auto')
   let g:clang_auto = 1
 endif
@@ -897,35 +909,7 @@ func! s:ClangCompleteDatabase()
 
     call s:PDebug("s:ClangCompleteInit::database", l:ccd)
     if filereadable(l:ccd)
-python << endpython
-import vim
-import re
-import json
-from os import path
-
-current = vim.eval("expand('%:p')")
-ccd = vim.eval("l:ccd")
-opts = []
-
-with open(ccd) as database:
-  data = json.load(database)
-
-  for d in data:
-    # hax for headers
-    fmatch = re.search(r'(.*)\.(\w+)$', current)
-    dmatch = re.search(r'(.*)\.(\w+)$', d['file'])
-
-    if fmatch.group(1) == dmatch.group(1):
-      for result in re.finditer(r'-D\s*[^\s]+', d['command']):
-        opts.append(result.group(0))
-      for result in re.finditer(r'-isystem\s*[^\s]+', d['command']):
-        opts.append(result.group(0))
-      for result in re.finditer(r'-I\s*([^\s]+)', d['command']):
-        opts.append('-I' + path.join(d['directory'], result.group(1)))
-      break
-
-vim.command("let l:clang_options = '" + ' '.join(opts) + "'")
-endpython
+      execute s:py . ' ' . s:complete_database_py
     endif
   endif
 
