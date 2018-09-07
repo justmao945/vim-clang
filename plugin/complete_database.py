@@ -50,6 +50,8 @@ with open(ccd) as database:
 
         for result in re.finditer(r'-D\s*[^\s]+', entry['command']):
             opts.append(result.group(0))
+        for result in re.finditer(r'-std\s*[^\s]+', entry['command']):
+            opts.append(result.group(0))
         for result in re.finditer(r'-isystem\s*[^\s]+', entry['command']):
             opts.append(result.group(0))
         for result in re.finditer(r'-I\s*([^\s]+)', entry['command']):
