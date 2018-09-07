@@ -3,32 +3,56 @@ import re
 import json
 from os import path
 
-curr_file = vim.eval("expand('%:p')")
-curr_file_noext = path.splitext(curr_file)[0]
+
+def get_entry_by_filename(entries, fn, key=None):
+    """Search for an entry in entries where key(entry['file']) matches
+    key(fn) and returns it. If key is None than file names are compared
+    directly. Returns None if none is found."""
+
+    if key is None:
+        key = lambda x: x
+
+    for e in entries:
+        if key(fn) == key(e['file']):
+            return e
+
+    return None
+
+def find_entry(entries, fn):
+    """Find an entry that matches the given filename fn more or less."""
+
+    entry = get_entry_by_filename(entries, curr_file)
+    if entry is not None:
+        return entry
+
+    key = lambda fn: path.splitext(fn)[0]
+    entry = get_entry_by_filename(entries, curr_file, key)
+    if entry is not None:
+        return entry
+
+    key = lambda fn: path.basename(path.splitext(fn)[0])
+    entry = get_entry_by_filename(entries, curr_file, key)
+    if entry is not None:
+        return entry
+
+    return None
+
 
 ccd = vim.eval("l:ccd")
-opts = []
-
 with open(ccd) as database:
-    # Search for the right entry in the database matching file names
-    for d in json.load(database):
-        # This is an entry without a file attribute
-        if 'file' not in d:
-            continue
+    entries = json.load(database)
 
-        # This entry is about a different file. We consider file names
-        # without extension to handle header files which do not have
-        # an entry in the database.
-        d_file_noext = path.splitext(d['file'])[0]
-        if d_file_noext != curr_file_noext:
-            continue
+    curr_file = vim.eval("expand('%:p')")
+    entry = find_entry(entries, curr_file)
 
-        for result in re.finditer(r'-D\s*[^\s]+', d['command']):
+    if entry is not None:
+        opts = []
+
+        for result in re.finditer(r'-D\s*[^\s]+', entry['command']):
             opts.append(result.group(0))
-        for result in re.finditer(r'-isystem\s*[^\s]+', d['command']):
+        for result in re.finditer(r'-isystem\s*[^\s]+', entry['command']):
             opts.append(result.group(0))
-        for result in re.finditer(r'-I\s*([^\s]+)', d['command']):
-            opts.append('-I' + path.join(d['directory'], result.group(1)))
-        break
+        for result in re.finditer(r'-I\s*([^\s]+)', entry['command']):
+            opts.append('-I' + path.join(entry['directory'], result.group(1)))
 
-vim.command("let l:clang_options = '" + ' '.join(opts) + "'")
+        vim.command("let l:clang_options = '" + ' '.join(opts) + "'")
