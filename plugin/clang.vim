@@ -15,8 +15,8 @@ else
   let s:py = 'pyfile'
 endif
 
-" Path to complete_database.py
-let s:complete_database_py = fnamemodify(resolve(expand('<sfile>:p')), ':h') . '/complete_database.py'
+" Path to compilation_database.py
+let s:compilation_database_py = fnamemodify(resolve(expand('<sfile>:p')), ':h') . '/compilation_database.py'
 
 if !exists('g:clang_auto')
   let g:clang_auto = 1
@@ -909,7 +909,7 @@ func! s:ClangCompleteDatabase()
 
     call s:PDebug("s:ClangCompleteInit::database", l:ccd)
     if filereadable(l:ccd)
-      execute s:py . ' ' . s:complete_database_py
+      execute s:py . ' ' . s:compilation_database_py
     endif
   endif
 
