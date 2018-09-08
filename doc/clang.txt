@@ -319,6 +319,28 @@ A: Please use with neocomplete, they can work well together.
 
 ==============================================================================
 CHANGELOG                                        *clang-changelog*
+
+dev
+* Add gvim support to clang_vim_exec [syswow]
+* Support different python infrastructure [shuber2]
+* Improve compile_commands support [shuber2]
+* Fix bugs
+
+0.6.0
+* Improve clang-format execution [blyoa]
+* Support syntax checking when saving file [Minijackson]
+* Add Neomake integration [Minijackson]
+* Support setting verbosity for popup menu [Minijackson]
+* Support enabling ClangFormat [odan]
+* Fix bugs
+
+0.5.0
+* Support mingw
+* Improve discovering default include directories [maxint]
+* Support setting path to gcc [maxint]
+* Support compile_commands.json [c0r73x]
+* Fix bugs
+
 0.4.1
 * Support Windows
 * Bug fix
