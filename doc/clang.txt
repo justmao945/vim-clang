@@ -320,55 +320,55 @@ A: Please use with neocomplete, they can work well together.
 ==============================================================================
 CHANGELOG                                        *clang-changelog*
 0.4.1
-* support Windows
-* bug fix
+* Support Windows
+* Bug fix
 
 0.4.0
-* improve job control for neovim [syswow]
-* support auto-close diagnostics window when leave
-* support syntax check when save source file
-* support neocomplete for header files completion
-* support clang-format
+* Improve job control for neovim [syswow]
+* Support auto-close diagnostics window when leave
+* Support syntax check when save source file
+* Support neocomplete for header files completion
+* Support clang-format
 
 0.3.0
-* support job control for neovim [syswow]
-* no need to write source file to disk before completion [mlen]
-* fix init plugin when create new file
-* bug fix
+* Support job control for neovim [syswow]
+* No need to write source file to disk before completion [mlen]
+* Fix init plugin when create new file
+* Bug fix
 
 0.2.8
-* bug fix on var set and restore
-* refactor DiagnosticsWindowClose
+* Bug fix on var set and restore
+* Refactor DiagnosticsWindowClose
 
 0.2.7
-* fix restore global var when call ClangComplete
+* Fix restore global var when call ClangComplete
 
 0.2.6
-* import include path from &path [thawk]
-* do not initialize plugin for non readable files [jreybert]
-* fix "can't remove clang warning #16" issue [jreybert]
-* add an option to load vim-clang only if .clang file is found [jreybert]
+* Import include path from &path [thawk]
+* Do not initialize plugin for non readable files [jreybert]
+* Fix "can't remove clang warning #16" issue [jreybert]
+* Add an option to load vim-clang only if .clang file is found [jreybert]
 
 0.2.5
-* update doc
+* Update doc
 
 0.2.4
-* ?
+* Fix bugs
 
-0.23
+0.2.3
 * Add g:clang_c_completeopt and g:clang_cpp_completeopt
 * Add g:clang_include_sysheaders
 * Add g:clang_dotfile_overwrite
 * Add ClangCompleteInit
 * Fix bugs
 
-0.22
+0.2.2
 * Change g:clang_diagsopt
 * Show diagnostics window before popup completion window
 * Add debug mode g:clang_debug
 * Fix bugs
 
-0.21
+0.2.1
 * Add async mode to execute clang
 * Add g:clang_pwheight, g:clang_statusline, g:clang_vim_exec
 * Add command "ClangClosePreviewDiagWindow"
