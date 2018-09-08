@@ -19,10 +19,10 @@ This is a plugin to complete C/C++ source code using Clang.
 ==============================================================================
 CONFIG                                          *clang-config*
 
-Vim-clang uses a file named ".clang" (same as .clang_complete for clang_complete)
-in the project root to save Clang options. Relative path is recommended when
-configure the include directory, so we can move the project to anywhere...
-Here is a tree to show the location of file '.clang'
+Vim-clang uses a file named ".clang" (same as .clang_complete for
+clang_complete) in the project root to save clang options. A relative path is
+recommended for configuring the include directory, so you can move the project
+to anywhere. Here is an example tree to show the location of file '.clang'
 .
 ├── build/
 ├── .clang
@@ -36,17 +36,17 @@ Here is a tree to show the location of file '.clang'
 ├── test/
 └── yacl/
 
-The file ".clang" only contains: "-I." to include files in directory "./".
-So that the source file should use #include "yacl/xxx.h" to include files.
+The file ".clang" only contains: "-I." to include files in directory "./". So
+that the source file contains #include "yacl/xxx.h" to include files.
 
-Now a new similar file named ".clang.ow" is added to deal with the special
-case that one want to overwrite all clang options, which means the one don't
-need automatically generated options for clang by the plugin.
-See |g:clang_dotfile_overwrite| for more details.
+A new, similar file named ".clang.ow" is added to deal with the special
+case that one wants to overwrite all clang options, which means the one don't
+need automatically generated options for clang by the plugin. See
+|g:clang_dotfile_overwrite| for more details.
 
-Please note that all options in ".clang" and ".clang.ow" must be safe
-to be used by the 'shell', that means special chars should always be
-escaped correctly. See |shellescape()| for more details.
+Please note that all options in ".clang" and ".clang.ow" must be safe to be
+used by the 'shell', that means special chars should always be escaped
+correctly. See |shellescape()| for more details.
 
 ==============================================================================
 VARIABLES                                       *clang-variables*
@@ -87,23 +87,22 @@ g:clang_cpp_completeopt                 *g:clang_cpp_completeopt*
         let g:clang_cpp_completeopt = 'longest,menuone,preview'
 <
 g:clang_debug                           *g:clang_debug*
-        Turns on debug mode with value being verbosity.
-        Accepts values from 0-4, anything above 3 will output all debug information
+        Turns on debug mode with value being verbosity. Accepts values from
+        0-4, anything above 3 will output all debug information
         Default: >
             let g:clang_debug = 0.
 <
 g:clang_diagsopt                        *g:clang_diagsopt*
-        This option is a string combined with split mode, colon,
-        and max height of the split window. Colon and max height are
-        optional.
+        This option is a string combined with split mode, colon, and max
+        height of the split window. Colon and max height are optional.
         e.g. >
             let g:clang_diagsopt = 'rightbelow:6'
             let g:clang_diagsopt = 'rightbelow'
             let g:clang_diagsopt = ''   " <- disable diagnostics
 <
-        If it equals '', disable clang diagnostics after completion,
-        otherwise diagnostics will be put in a split window/viewport.
-        Split policy indicators and their corresponding modes are: >
+        If it equals '', disable clang diagnostics after completion, otherwise
+        diagnostics will be put in a split window/viewport. Split policy
+        indicators and their corresponding modes are: >
             " disable diagnostics window
             let g:clang_diagsopt = ''
 
@@ -123,21 +122,21 @@ g:clang_diagsopt                        *g:clang_diagsopt*
         let g:clang_diagsopt = 'rightbelow:6'
 <
 g:clang_dotfile                         *g:clang_dotfile*
-        Each project can have a dot file at his root, containing
-        the compiler options. This is useful if you're using some
-        non-standard include paths.
+        Each project can have a dot file at his root, containing the compiler
+        options. This is useful if you're using some non-standard include
+        paths.
         Note: Relative include and library path is recommended.
     Default: >
         let g:clang_dotfile = '.clang'
 <
 g:clang_dotfile_overwrite               *g:clang_dotfile_overwrite*
-        Same as |g:clang_dotfile| but has higher priority than it.
-        Options in |g:clang_dotfile| will be appended to discovered
-        options that from |g:clang_c_options|, |g:clang_cpp_options|
-        and |g:clang_include_sysheaders|. But if |g:clang_dotfile_overwrite|
-        file is exist, plugin will not do the discovery anymore, only add
-        the minimum of options and append |g:clang_dotfile_overwrite|
-        to them before calling clang.
+        Same as |g:clang_dotfile| but has higher priority than it. Options in
+        |g:clang_dotfile| will be appended to discovered options that from
+        |g:clang_c_options|, |g:clang_cpp_options| and
+        |g:clang_include_sysheaders|. But if |g:clang_dotfile_overwrite| file
+        is exist, plugin will not do the discovery anymore, only add the
+        minimum of options and append |g:clang_dotfile_overwrite| to them
+        before calling clang.
         Note: This is very useful if you are doing some cross-platform
         projects, they may have different include directories and options.
     Default: >
@@ -150,9 +149,9 @@ g:clang_exec                            *g:clang_exec*
         let g:clang_exec = 'clang'
 
 g:clang_gcc_exec                        *g:clang_gcc_exec*
-        Name or path of executable gcc. Use this if gcc has a
-        non-standard name, or isn't in the path. It's used to search the
-        system default include directories of gcc.
+        Name or path of executable gcc. Use this if gcc has a non-standard
+        name, or isn't in the path. It's used to search the system default
+        include directories of gcc.
     Default: >
         let g:clang_gcc_exec = 'gcc'
 <
@@ -185,9 +184,8 @@ g:clang_include_sysheaders              *g:clang_include_sysheaders*
         let g:clang_include_sysheaders = 1
 <
 g:clang_include_sysheaders_from_gcc     *g:clang_include_sysheaders_from_gcc*
-        Discover default system C/C++ headers automatically for g:clang_gcc_exec
-        instead of g:clang_exec.
-        Set 1 to enable it.
+        Discover default system C/C++ headers automatically for
+        g:clang_gcc_exec instead of g:clang_exec. Set 1 to enable it.
     Default: >
         let g:clang_include_sysheaders_from_gcc = 0
 <
@@ -234,9 +232,10 @@ g:clang_use_path                        *g:clang_use_path*
         let g:clang_use_path = 1
 <
 g:clang_verbose_pmenu                        *g:clang_verbose_pmenu*
-          Control the verbose level of popup menu, which is similar to Youcompleteme.
-          For example, the popup menu would show 'push_back(const_reference __x) f [O] void'
-          instead of 'push_back' if is set to 1.
+        Control the verbose level of popup menu, which is similar to
+        Youcompleteme.  For example, the popup menu would show
+        'push_back(const_reference __x) f [O] void' instead of 'push_back' if
+        is set to 1.
      Default: >
           let g:clang_verbose_pmenu = 0
 <
@@ -273,7 +272,7 @@ ClangCloseWindow                        *ClangCloseWindow*
 <
 ClangCompleteInit                       *ClangCompleteInit*
         Re-initialize the plugin, very useful to reload the plugin after
-        chaging configuration or |g:clang_dotfile|. Use ':e' to reload file
+        changing configuration or |g:clang_dotfile|. Use ':e' to reload file
         is OK, too.
 
 ClangFormat                             *ClangFormat*
@@ -284,18 +283,18 @@ ClangGenPCHFromFile <stdafx.h>          *ClangGenPCHFromFile*
         be '%' (aka current file name).
 
 ClangSyntaxCheck                        *ClangSyntaxCheck*
-        Run syntax check mannually. Syntax checker will be called when save
+        Run syntax check manually. Syntax checker will be called when save
         file if |g:clang_check_syntax_auto| is set to 1, and diagnostics
         window will be opened if has error.
 
 ==============================================================================
 FAQ                                              *clang-faq*
 
-Q: How to open diagnostics window ?
+Q: How to open diagnostics window?
 A: Diagnostics window will be opened automatically when some errors occured
    in your source code, and dismissed when they are fixed or change buffers.
 
-Q: How to complete head files ?
+Q: How to complete head files?
 A: Please use with neocomplete, they can work well together.
 
         " disable auto completion for vim-clang
@@ -319,56 +318,78 @@ A: Please use with neocomplete, they can work well together.
 
 ==============================================================================
 CHANGELOG                                        *clang-changelog*
+
+dev
+* Add gvim support to clang_vim_exec [syswow]
+* Support different python infrastructure [shuber2]
+* Improve compile_commands support [shuber2]
+* Fix bugs
+
+0.6.0
+* Improve clang-format execution [blyoa]
+* Support syntax checking when saving file [Minijackson]
+* Add Neomake integration [Minijackson]
+* Support setting verbosity for popup menu [Minijackson]
+* Support enabling ClangFormat [odan]
+* Fix bugs
+
+0.5.0
+* Support mingw
+* Improve discovering default include directories [maxint]
+* Support setting path to gcc [maxint]
+* Support compile_commands.json [c0r73x]
+* Fix bugs
+
 0.4.1
-* support Windows
-* bug fix
+* Support Windows
+* Bug fix
 
 0.4.0
-* improve job control for neovim [syswow]
-* support auto-close diagnostics window when leave
-* support syntax check when save source file
-* support neocomplete for header files completion
-* support clang-format
+* Improve job control for neovim [syswow]
+* Support auto-close diagnostics window when leave
+* Support syntax check when save source file
+* Support neocomplete for header files completion
+* Support clang-format
 
 0.3.0
-* support job control for neovim [syswow]
-* no need to write source file to disk before completion [mlen]
-* fix init plugin when create new file
-* bug fix
+* Support job control for neovim [syswow]
+* No need to write source file to disk before completion [mlen]
+* Fix init plugin when create new file
+* Bug fix
 
 0.2.8
-* bug fix on var set and restore
-* refactor DiagnosticsWindowClose
+* Bug fix on var set and restore
+* Refactor DiagnosticsWindowClose
 
 0.2.7
-* fix restore global var when call ClangComplete
+* Fix restore global var when call ClangComplete
 
 0.2.6
-* import include path from &path [thawk]
-* do not initialize plugin for non readable files [jreybert]
-* fix "can't remove clang warning #16" issue [jreybert]
-* add an option to load vim-clang only if .clang file is found [jreybert]
+* Import include path from &path [thawk]
+* Do not initialize plugin for non readable files [jreybert]
+* Fix "can't remove clang warning #16" issue [jreybert]
+* Add an option to load vim-clang only if .clang file is found [jreybert]
 
 0.2.5
-* update doc
+* Update doc
 
 0.2.4
-* ?
+* Fix bugs
 
-0.23
+0.2.3
 * Add g:clang_c_completeopt and g:clang_cpp_completeopt
 * Add g:clang_include_sysheaders
 * Add g:clang_dotfile_overwrite
 * Add ClangCompleteInit
 * Fix bugs
 
-0.22
+0.2.2
 * Change g:clang_diagsopt
 * Show diagnostics window before popup completion window
 * Add debug mode g:clang_debug
 * Fix bugs
 
-0.21
+0.2.1
 * Add async mode to execute clang
 * Add g:clang_pwheight, g:clang_statusline, g:clang_vim_exec
 * Add command "ClangClosePreviewDiagWindow"
