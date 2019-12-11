@@ -37,6 +37,15 @@ def find_entry(entries, fn):
 
     return None
 
+def option(match, directory):
+    return match.group(0) if match.group(1) != 'I' else '-I' + path.join(directory, match.group(2))
+
+def arguments(input):
+    return lambda e: map(re.compile(e).match, input)
+
+def command(input):
+    return lambda e: re.finditer(e, input)
+
 
 ccd = vim.eval("l:ccd")
 with open(ccd) as database:
@@ -46,15 +55,9 @@ with open(ccd) as database:
     entry = find_entry(entries, curr_file)
 
     if entry is not None:
-        opts = []
+        input = arguments(entry['arguments']) if 'arguments' in entry else command(entry['command'])
 
-        for result in re.finditer(r'-D\s*[^\s]+', entry['command']):
-            opts.append(result.group(0))
-        for result in re.finditer(r'-std\s*[^\s]+', entry['command']):
-            opts.append(result.group(0))
-        for result in re.finditer(r'-isystem\s*[^\s]+', entry['command']):
-            opts.append(result.group(0))
-        for result in re.finditer(r'-I\s*([^\s]+)', entry['command']):
-            opts.append('-I' + path.join(entry['directory'], result.group(1)))
+        filter_expr = r'-(D|I|std|isystem)\s*([^\s]+)'
+        opts = [option(x, entry['directory']) for x in input(filter_expr) if x]
 
         vim.command("let l:clang_options = '" + ' '.join(opts) + "'")
