@@ -38,7 +38,7 @@ def find_entry(entries, fn):
     return None
 
 def option(match, directory):
-    return match.group(0) if match.group(1) != 'I' else '-I' + path.join(directory, match.group(2))
+    return match.group(0) if (match.group(1) != 'I') and (match.group(1) != 'iquote') else '-' + match.group(1) + ' ' + path.join(directory, match.group(2))
 
 def arguments(input):
     return lambda e: map(re.compile(e).match, input)
@@ -57,7 +57,7 @@ with open(ccd) as database:
     if entry is not None:
         input = arguments(entry['arguments']) if 'arguments' in entry else command(entry['command'])
 
-        filter_expr = r'-(D|I|std|isystem)\s*([^\s]+)'
+        filter_expr = r'-(D|I|std|isystem|iquote)\s*([^\s]+)'
         opts = [option(x, entry['directory']) for x in input(filter_expr) if x]
 
         vim.command("let l:clang_options = '" + ' '.join(opts) + "'")
