@@ -683,7 +683,7 @@ func! s:ParseCompletionResult(output, base)
       "let l:proto = substitute(l:proto, '\(<#\)\|\(#>\)\|#', '', 'g')
       " Identify the type (test)
       if empty(l:res) || l:res[-1]['word'] !=# l:word
-        if l:proto =~ '\v^\[#.{-}#\].+\(.*\).*' 
+        if l:proto =~ '\v^\[#.{-}#\].+\(.*\).*'
           let l:kind = 'f'
         elseif l:proto =~ '\v^\[#.*#\].+'
           let l:kind = 'v'
@@ -937,12 +937,17 @@ func! s:ClangCompleteInit(force)
   endif
 
   " find project file first
+  let l:localdir = haslocaldir()
   let l:cwd = fnameescape(getcwd())
   let l:fwd = fnameescape(expand('%:p:h'))
   silent exe 'lcd ' . l:fwd
   let l:dotclang    = findfile(g:clang_dotfile, '.;')
   let l:dotclangow  = findfile(g:clang_dotfile_overwrite, '.;')
-  silent exe 'lcd '.l:cwd
+  if l:localdir
+    silent exe 'lcd ' . l:cwd
+  else
+    silent exe 'cd '. fnameescape(getcwd(-1))
+  end
 
   let l:has_dotclang = strlen(l:dotclang) + strlen(l:dotclangow)
   if !l:has_dotclang && g:clang_load_if_clang_dotfile
@@ -1030,13 +1035,18 @@ func! s:ClangCompleteInit(force)
   " try to find PCH files in clang_root and clang_root/include
   " Or add `-include-pch /path/to/x.h.pch` into the root file .clang manully
   if &filetype == 'cpp' && b:clang_options !~# '-include-pch'
+    let l:localdir = haslocaldir()
     let l:cwd = fnameescape(getcwd())
     silent exe 'lcd ' . b:clang_root
     let l:afx = findfile(g:clang_stdafx_h, '.;./include') . '.pch'
     if filereadable(l:afx)
       let b:clang_options .= ' -include-pch ' . shellescape(l:afx)
     endif
-    silent exe 'lcd '.l:cwd
+    if l:localdir
+      silent exe 'lcd ' . l:cwd
+    else
+      silent exe 'cd ' . fnameescape(getcwd(-1))
+    end
   endif
 
   " Create GenPCH command
@@ -1149,6 +1159,7 @@ endf
 " @col Column to complete
 " @return [completion, diagnostics]
 func! s:ClangExecute(root, clang_options, line, col)
+  let l:localdir = haslocaldir()
   let l:cwd = fnameescape(getcwd())
   silent exe 'lcd ' . a:root
   let l:src = join(getline(1, '$'), "\n") . "\n"
@@ -1219,7 +1230,11 @@ func! s:ClangExecute(root, clang_options, line, col)
       call s:PError('s:ClangExecute::acmd', 'execute async command failed')
     endif
   endif
-  silent exe 'lcd ' . l:cwd
+  if l:localdir
+    silent exe 'lcd ' . l:cwd
+  else
+    silent exe 'cd ' . fnameescape(getcwd(-1))
+  end
   let b:clang_state['stdout'] = l:res[0]
   let b:clang_state['stderr'] = l:res[1]
   return l:res
@@ -1264,6 +1279,7 @@ endf
 " Only do syntax check without completion, will open diags window when have
 " problem. Now this function will block...
 func! s:ClangSyntaxCheck(root, clang_options)
+  let l:localdir = haslocaldir()
   let l:cwd = fnameescape(getcwd())
   silent exe 'lcd ' . a:root
   let l:src = join(getline(1, '$'), "\n")
@@ -1271,7 +1287,11 @@ func! s:ClangSyntaxCheck(root, clang_options)
   call s:PDebug("ClangSyntaxCheck::command", l:command)
   let l:clang_output = system(l:command, l:src)
   call s:DiagnosticsWindowOpen(expand('%:p:.'), split(l:clang_output, '\n'))
-  silent exe 'lcd ' . l:cwd
+  if l:localdir
+    silent exe 'lcd ' . l:cwd
+  else
+    silent exe 'cd ' . fnameescape(getcwd(-1))
+  end
 endf
 " }}}
 " {{{ s:ClangFormat
