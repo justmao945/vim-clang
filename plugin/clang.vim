@@ -941,8 +941,8 @@ func! s:ClangCompleteInit(force)
   let l:cwd = fnameescape(getcwd())
   let l:fwd = fnameescape(expand('%:p:h'))
   silent exe 'lcd ' . l:fwd
-  let l:dotclang    = findfile(g:clang_dotfile, '.;')
-  let l:dotclangow  = findfile(g:clang_dotfile_overwrite, '.;')
+  let l:dotclang    = fnamemodify(findfile(g:clang_dotfile, '.;'), ':p')
+  let l:dotclangow  = fnamemodify(findfile(g:clang_dotfile_overwrite, '.;'), ':p')
   if l:localdir
     silent exe 'lcd ' . l:cwd
   else
