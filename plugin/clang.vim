@@ -903,7 +903,7 @@ func! s:ClangCompleteDatabase()
 
   if g:clang_compilation_database !=# ''
     let l:ccd = fnameescape(fnamemodify(
-          \ g:clang_compilation_database . '/compile_commands.json', '%:p'))
+          \ g:clang_compilation_database, '%:p'))
     let b:clang_root = fnameescape(fnamemodify(
           \ g:clang_compilation_database, ':p:h'))
 
