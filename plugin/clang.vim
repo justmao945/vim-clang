@@ -946,7 +946,7 @@ func! s:ClangCompleteInit(force)
   if l:localdir
     silent exe 'lcd ' . l:cwd
   else
-    silent exe 'cd '. fnameescape(getcwd(-1))
+    silent exe 'cd ' . l:cwd
   end
 
   let l:has_dotclang = strlen(l:dotclang) + strlen(l:dotclangow)
@@ -1045,7 +1045,7 @@ func! s:ClangCompleteInit(force)
     if l:localdir
       silent exe 'lcd ' . l:cwd
     else
-      silent exe 'cd ' . fnameescape(getcwd(-1))
+      silent exe 'cd ' . l:cwd
     end
   endif
 
@@ -1233,7 +1233,7 @@ func! s:ClangExecute(root, clang_options, line, col)
   if l:localdir
     silent exe 'lcd ' . l:cwd
   else
-    silent exe 'cd ' . fnameescape(getcwd(-1))
+    silent exe 'cd ' . l:cwd
   end
   let b:clang_state['stdout'] = l:res[0]
   let b:clang_state['stderr'] = l:res[1]
@@ -1290,7 +1290,7 @@ func! s:ClangSyntaxCheck(root, clang_options)
   if l:localdir
     silent exe 'lcd ' . l:cwd
   else
-    silent exe 'cd ' . fnameescape(getcwd(-1))
+    silent exe 'cd ' . l:cwd
   end
 endf
 " }}}
