@@ -18,8 +18,8 @@ def get_entry_by_filename(entries, fn, key=None):
 
     return None
 
-def find_entry(entries, fn):
-    """Find an entry that matches the given filename fn more or less."""
+def find_entry(entries, curr_file):
+    """Find an entry that matches the given filename curr_file more or less."""
 
     entry = get_entry_by_filename(entries, curr_file)
     if entry is not None:

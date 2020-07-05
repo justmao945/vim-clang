@@ -903,7 +903,7 @@ func! s:ClangCompleteDatabase()
 
   if g:clang_compilation_database !=# ''
     let l:ccd = fnameescape(fnamemodify(
-          \ g:clang_compilation_database . '/compile_commands.json', '%:p'))
+          \ g:clang_compilation_database, '%:p'))
     let b:clang_root = fnameescape(fnamemodify(
           \ g:clang_compilation_database, ':p:h'))
 
@@ -941,12 +941,12 @@ func! s:ClangCompleteInit(force)
   let l:cwd = fnameescape(getcwd())
   let l:fwd = fnameescape(expand('%:p:h'))
   silent exe 'lcd ' . l:fwd
-  let l:dotclang    = findfile(g:clang_dotfile, '.;')
-  let l:dotclangow  = findfile(g:clang_dotfile_overwrite, '.;')
+  let l:dotclang    = fnamemodify(findfile(g:clang_dotfile, '.;'), ':p')
+  let l:dotclangow  = fnamemodify(findfile(g:clang_dotfile_overwrite, '.;'), ':p')
   if l:localdir
     silent exe 'lcd ' . l:cwd
   else
-    silent exe 'cd '. fnameescape(getcwd(-1))
+    silent exe 'cd ' . l:cwd
   end
 
   let l:has_dotclang = strlen(l:dotclang) + strlen(l:dotclangow)
@@ -1045,7 +1045,7 @@ func! s:ClangCompleteInit(force)
     if l:localdir
       silent exe 'lcd ' . l:cwd
     else
-      silent exe 'cd ' . fnameescape(getcwd(-1))
+      silent exe 'cd ' . l:cwd
     end
   endif
 
@@ -1233,7 +1233,7 @@ func! s:ClangExecute(root, clang_options, line, col)
   if l:localdir
     silent exe 'lcd ' . l:cwd
   else
-    silent exe 'cd ' . fnameescape(getcwd(-1))
+    silent exe 'cd ' . l:cwd
   end
   let b:clang_state['stdout'] = l:res[0]
   let b:clang_state['stderr'] = l:res[1]
@@ -1290,7 +1290,7 @@ func! s:ClangSyntaxCheck(root, clang_options)
   if l:localdir
     silent exe 'lcd ' . l:cwd
   else
-    silent exe 'cd ' . fnameescape(getcwd(-1))
+    silent exe 'cd ' . l:cwd
   end
 endf
 " }}}
