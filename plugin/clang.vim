@@ -902,14 +902,19 @@ func! s:ClangCompleteDatabase()
   let l:clang_options = ''
 
   if g:clang_compilation_database !=# ''
-    let l:ccd = fnameescape(fnamemodify(
-          \ g:clang_compilation_database, '%:p'))
-    let b:clang_root = fnameescape(fnamemodify(
-          \ g:clang_compilation_database, ':p:h'))
-
+    let l:ccd = fnameescape(fnamemodify(g:clang_compilation_database . '/compile_commands.json', '%:p'))
+    let b:clang_root = fnameescape(fnamemodify(g:clang_compilation_database, ':p:h'))
     call s:PDebug("s:ClangCompleteInit::database", l:ccd)
     if filereadable(l:ccd)
       execute s:py . ' ' . s:compilation_database_py
+    else
+      let build_path = finddir(g:clang_compilation_database, '.;')
+      if build_path !=# ''
+        let l:ccd = fnameescape(fnamemodify(build_path . '/compile_commands.json', '%:p'))
+        if filereadable(l:ccd)
+          execute s:py . ' ' . s:compilation_database_py
+        endif
+      endif
     endif
   endif
 
