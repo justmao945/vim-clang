@@ -945,14 +945,18 @@ func! s:ClangCompleteInit(force)
   let l:localdir = haslocaldir()
   let l:cwd = fnameescape(getcwd())
   let l:fwd = fnameescape(expand('%:p:h'))
-  silent exe 'lcd ' . l:fwd
-  let l:dotclang    = fnamemodify(findfile(g:clang_dotfile, '.;'), ':p')
-  let l:dotclangow  = fnamemodify(findfile(g:clang_dotfile_overwrite, '.;'), ':p')
-  if l:localdir
-    silent exe 'lcd ' . l:cwd
-  else
-    silent exe 'cd ' . l:cwd
-  end
+  let l:dotclang    = ''
+  let l:dotclangow  = ''
+  if isdirectory(l:fwd)
+    silent exe 'lcd ' . l:fwd
+    let l:dotclang    = fnamemodify(findfile(g:clang_dotfile, '.;'), ':p')
+    let l:dotclangow  = fnamemodify(findfile(g:clang_dotfile_overwrite, '.;'), ':p')
+    if l:localdir
+      silent exe 'lcd ' . l:cwd
+    else
+      silent exe 'cd ' . l:cwd
+    end
+  endif
 
   let l:has_dotclang = strlen(l:dotclang) + strlen(l:dotclangow)
   if !l:has_dotclang && g:clang_load_if_clang_dotfile
@@ -1042,16 +1046,20 @@ func! s:ClangCompleteInit(force)
   if &filetype == 'cpp' && b:clang_options !~# '-include-pch'
     let l:localdir = haslocaldir()
     let l:cwd = fnameescape(getcwd())
-    silent exe 'lcd ' . b:clang_root
-    let l:afx = findfile(g:clang_stdafx_h, '.;./include') . '.pch'
-    if filereadable(l:afx)
-      let b:clang_options .= ' -include-pch ' . shellescape(l:afx)
+    if isdirectory(b:clang_root)
+      silent exe 'lcd ' . b:clang_root
+      let l:afx = findfile(g:clang_stdafx_h, '.;./include') . '.pch'
+      if filereadable(l:afx)
+        let b:clang_options .= ' -include-pch ' . shellescape(l:afx)
+      endif
+      if isdirectory(l:cwd)
+        if l:localdir
+          silent exe 'lcd ' . l:cwd
+        else
+          silent exe 'cd ' . l:cwd
+        end
+      endif
     endif
-    if l:localdir
-      silent exe 'lcd ' . l:cwd
-    else
-      silent exe 'cd ' . l:cwd
-    end
   endif
 
   " Create GenPCH command
