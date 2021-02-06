@@ -138,6 +138,22 @@ if !exists('g:clang_verbose_pmenu')
   let g:clang_verbose_pmenu = 0
 endif
 
+if !exists('g:clang_tidy_tmp_yaml_path')
+  let g:clang_tidy_tmp_yaml_path = "/tmp/vim-clang-tidy.yaml"
+endif
+
+if !exists('g:clang_tidy_opt')
+  let g:clang_tidy_opt = "--header-filter='.*' --format-style=file --checks='*'"
+endif
+
+if !exists('g:clang_tidy_command')
+  let g:clang_tidy_command = "clang-tidy"
+endif
+
+if !exists('g:clang_tidy_auto')
+  let g:clang_tidy_auto = 0
+endif
+
 " Init on c/c++ files
 au FileType c,cpp call <SID>ClangCompleteInit(0)
 "}}}
@@ -1074,6 +1090,9 @@ func! s:ClangCompleteInit(force)
   " Useful to check syntax only
   com! ClangSyntaxCheck call <SID>ClangSyntaxCheck(b:clang_root, b:clang_options)
 
+  " Useful to check clang-tidy only
+  com! ClangTidy call <SID>ClangTidy()
+
   if g:clang_enable_format_command
     " Useful to format source code
     com! ClangFormat call <SID>ClangFormat()
@@ -1110,6 +1129,11 @@ func! s:ClangCompleteInit(force)
   " auto check syntax when write buffer
 	if g:clang_check_syntax_auto
 		au BufWritePost <buffer> ClangSyntaxCheck
+	endif
+
+  " auto clang-tidy when write buffer
+	if g:clang_tidy_auto
+		au BufWritePost <buffer> ClangTidy
 	endif
 
   " auto format current file if is enabled
@@ -1305,6 +1329,57 @@ func! s:ClangSyntaxCheck(root, clang_options)
   else
     silent exe 'cd ' . l:cwd
   end
+endf
+" }}}
+"{{{ s:ClangTidy
+" Run clang-tidy on current file and add sign and diagnostic window
+func! s:ClangTidy()
+  call system("rm -f " . g:clang_tidy_tmp_yaml_path)
+  exe ":sign unplace *"
+  let l:current_file =  fnamemodify(bufname("%"), ':p')
+  let l:clang_tidy_compile_command_json_dir_opt = ""
+  let l:clang_compilation_database_dir = finddir(g:clang_compilation_database, '.;')
+  if l:clang_compilation_database_dir !=# ''
+    let l:clang_tidy_compile_command_json_dir_opt = "-p " . l:clang_compilation_database_dir
+  endif
+  let g:full_clang_tidy_command = g:clang_tidy_command . " " . g:clang_tidy_opt . " " . l:clang_tidy_compile_command_json_dir_opt  . " --export-fixes=" . g:clang_tidy_tmp_yaml_path . " " . l:current_file
+  echo g:full_clang_tidy_command
+  call system(g:full_clang_tidy_command)
+  if filereadable(g:clang_tidy_tmp_yaml_path)
+    let l:yaml_to_json_cmd = "python3 -c 'import yaml, json, sys; print(json.dumps(yaml.load(open(sys.argv[1]), Loader=yaml.CLoader)))' " . g:clang_tidy_tmp_yaml_path
+    let l:clang_tidy_json = system(l:yaml_to_json_cmd)
+    let l:clang_tidy_dict = json_decode(l:clang_tidy_json)
+    let l:diagnostics = get(l:clang_tidy_dict, "Diagnostics")
+    let l:msgs = []
+    let l:error_counter = 0
+    let l:warning_counter = 0
+    for l:diag in l:diagnostics
+        let l:diag_msg = get(l:diag, 'DiagnosticMessage', '')
+        if l:current_file == get(l:diag_msg, 'FilePath', '')
+            let l:file_offset = get(l:diag_msg, 'FileOffset', '')
+            let l:line = byte2line(l:file_offset+1)
+            let l:level = get(l:diag, 'Level', '')
+            let l:category = get(l:diag, 'DiagnosticName', '')
+            if l:level ==# "Error"
+              let l:clangtidy_sign_name = "clangtidy_error"
+              sign define clangtidy_error text=>> texthl=Error
+              let l:error_counter = l:error_counter + 1
+            else
+              let l:clangtidy_sign_name = "clangtidy_warning"
+              sign define clangtidy_warning text=>> texthl=Search
+              let l:warning_counter = l:warning_counter + 1
+            endif
+
+            exe ":sign place 2 line=" . l:line . " " . "name=" . l:clangtidy_sign_name . " file=" . l:current_file
+            let l:formatted_msg = "[clang-tidy] " . l:line . ": " . get(l:diag_msg, 'Message', '') . " (" . l:category . ")"
+            call add(l:msgs, formatted_msg)
+        endif
+    endfor
+    call s:DiagnosticsWindowOpen(expand('%:p:.'), l:msgs)
+    echo "Clang-tidy detected " . error_counter . " errors and " . warning_counter . " warnings"
+  else
+    echo "Clang-tidy detected no errors"
+  endif
 endf
 " }}}
 " {{{ s:ClangFormat
