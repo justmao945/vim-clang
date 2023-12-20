@@ -430,7 +430,7 @@ func! s:DiagnosticsWindowOpen(src, diags)
   setl buftype=nofile bufhidden=hide
   setl noswapfile nobuflisted nowrap nonumber nospell nomodifiable winfixheight winfixwidth
   setl cursorline
-  setl colorcolumn=-1
+  setl colorcolumn=
 
   " Don't use indentLine in the diagnostics window
   " See https://github.com/Yggdroot/indentLine.git
